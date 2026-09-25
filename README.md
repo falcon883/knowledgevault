@@ -6,7 +6,7 @@ keyword. Built as the MSCS 3999 capstone project at Clark University,
 Fall 2026.
 
 **Team:** Durvank Deorukhkar, Percival Tapera
-**Jira project:** _add your Jira project link here_
+**Jira project:** [Project_Link](https://clarkcapstone.atlassian.net/jira/software/projects/KV/boards/2?filter=&groupBy=none&atlOrigin=eyJpIjoiZTNiYTIwZjA5MzI3NDhjMzhhNDk0OTdhMmFmM2NiZWMiLCJwIjoiaiJ9)
 **Docs:** see [`/docs`](./docs) for the Project Charter and Vision/Roadmap/Release Plan.
 
 ## Repository structure
