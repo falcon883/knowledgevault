@@ -2,7 +2,26 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
-  background-color: #fafafa;
+  min-width: 320px;
+  background: #f8fbff;
+  color: #122033;
+}
+
+a,
+button {
+  transition: all 0.2s ease;
+}
+
+button {
+  font: inherit;
+}
+
+#root {
+  min-height: 100vh;
 }
