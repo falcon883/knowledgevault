@@ -1,10 +1,36 @@
 # KnowledgeVault Backend
 
-## KV-6: Upload endpoint and text extraction
+## KV-7: Initial data model
 
-Builds on the KV-5 scaffold. Adds `POST /upload`, which accepts a PDF or
-plain-text file and returns its extracted text. Nothing is persisted yet
-(see KV-7 for the data model).
+Defines the schema for documents and chunks using SQLAlchemy, so both of
+you build against the same structure going forward.
+
+## Schema
+
+**documents**
+| column | type | notes |
+|---|---|---|
+| id | integer, PK | |
+| filename | string | |
+| content_type | string | e.g. `application/pdf` |
+| size_bytes | integer | |
+| extracted_text | text | full text from KV-6's extraction |
+| uploaded_at | datetime | defaults to now (UTC) |
+| tags | text | comma-separated; filled in once auto-tagging exists (Theme 2) |
+| summary | text | filled in once summarization exists (Theme 2) |
+
+**chunks**
+| column | type | notes |
+|---|---|---|
+| id | integer, PK | |
+| document_id | integer, FK -> documents.id | |
+| chunk_index | integer | position within the document |
+| text | text | the chunk's text content |
+| embedding | text | placeholder until the vector DB/embedding model is picked (Theme 2) |
+
+No `user_id` / ownership column yet - auth and per-user data isolation
+are Theme 4 work, so that column is added when that lands rather than
+now.
 
 ## Setup
 
@@ -15,38 +41,32 @@ source venv/bin/activate       # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Run
+By default this uses a local SQLite file (`knowledgevault.db`, gitignored)
+so there's nothing to install to try it out. To point at real Postgres
+later, set an environment variable before running:
 
 ```bash
-python main.py
+export DATABASE_URL="postgresql://user:password@host:5432/knowledgevault"
 ```
 
-Runs at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
-
-## Test it
+## Create the tables
 
 ```bash
-curl http://localhost:8000/health
-
-curl -F "file=@/path/to/some.pdf;type=application/pdf" http://localhost:8000/upload
-curl -F "file=@/path/to/some.txt;type=text/plain" http://localhost:8000/upload
+python init_db.py
 ```
 
-Expected response shape:
-```json
-{
-  "filename": "some.pdf",
-  "content_type": "application/pdf",
-  "size_bytes": 1426,
-  "extracted_text": "...",
-  "extracted_length": 69,
-  "status": "extracted (not yet persisted - see KV-7)"
-}
+## Verify the schema works
+
+```bash
+python test_models.py
 ```
 
-Supported file types: `application/pdf`, `text/plain`. Anything else
-returns a 400 with a clear error message.
+Inserts a document and a chunk, confirms the relationship works, then
+cleans up after itself. Should print "KV-7 schema check passed."
 
 ## Next steps
 
-- KV-7: define the data model and start persisting uploaded documents
+- Wire `POST /upload` (KV-6) to actually save a `Document` row instead of
+  just returning the extracted text
+- Roadmap Theme 2: chunking strategy, embedding generation, fill in the
+  `embedding` column for real
