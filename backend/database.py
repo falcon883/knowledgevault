@@ -1,10 +1,10 @@
 """
 KnowledgeVault backend - database connection setup.
 
-Defaults to a local SQLite file so both of you can run this without
-installing Postgres. Set the DATABASE_URL environment variable to point
-at real Postgres once AWS deployment (Theme 4) is set up - the models in
-models.py work unchanged either way since they're plain SQLAlchemy.
+Sprint 2 switches the default from SQLite to Postgres, because the
+`chunks.embedding` column now uses pgvector (see models.py), which is a
+Postgres extension and has no SQLite equivalent. Point DATABASE_URL at
+your own local Postgres instance; see backend/README.md for setup.
 """
 
 import os
@@ -12,12 +12,16 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./knowledgevault.db")
+from dotenv import load_dotenv
 
-# check_same_thread is only needed for SQLite; harmless to set generally.
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+load_dotenv()
 
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+psycopg2://knowledgevault:knowledgevault@localhost:5432/knowledgevault",
+)
+
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

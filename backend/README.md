@@ -1,38 +1,58 @@
 # KnowledgeVault Backend
 
-## KV-7: Initial data model
+## Sprint 2: ingestion pipeline + semantic search foundation
 
-Defines the schema for documents and chunks using SQLAlchemy, so both of
-you build against the same structure going forward.
+Builds on Sprint 1 (KV-5/6/7). This sprint:
 
-## Schema
+- **KV-13**: `POST /upload` now actually persists a `Document` row instead
+  of just returning extracted text.
+- **KV-14**: document text is split into overlapping chunks (`chunking.py`).
+- **KV-15**: each chunk is embedded locally (`embeddings.py`) and stored in
+  a **pgvector** column for semantic similarity search.
 
-**documents**
-| column | type | notes |
-|---|---|---|
-| id | integer, PK | |
-| filename | string | |
-| content_type | string | e.g. `application/pdf` |
-| size_bytes | integer | |
-| extracted_text | text | full text from KV-6's extraction |
-| uploaded_at | datetime | defaults to now (UTC) |
-| tags | text | comma-separated; filled in once auto-tagging exists (Theme 2) |
-| summary | text | filled in once summarization exists (Theme 2) |
+Not yet wired in (separate Sprint 2 tickets): auto-tagging/summarization
+(KV-21), the `/search` endpoint (KV-16), and the frontend screens
+(KV-17/18/19).
 
-**chunks**
-| column | type | notes |
-|---|---|---|
-| id | integer, PK | |
-| document_id | integer, FK -> documents.id | |
-| chunk_index | integer | position within the document |
-| text | text | the chunk's text content |
-| embedding | text | placeholder until the vector DB/embedding model is picked (Theme 2) |
+## Why pgvector + local embeddings
 
-No `user_id` / ownership column yet - auth and per-user data isolation
-are Theme 4 work, so that column is added when that lands rather than
-now.
+Decided at the Sprint 2 kickoff (KV-20), per the Project Charter's
+instruction to finalize the vector database choice in Sprint 1-2
+(Section 3.7):
+
+- **pgvector** (a Postgres extension) instead of a separate managed
+  vector database. The team already runs Postgres for document/chunk
+  metadata, so this avoids standing up, paying for, and syncing data
+  between two separate systems. It's free and integrates directly with
+  the existing SQLAlchemy models.
+- **sentence-transformers, run locally** (`all-MiniLM-L6-v2`, 384-dim)
+  instead of a hosted embedding API. No API key, no rate limits, no
+  per-call cost, and it removes the "third-party API/service dependency"
+  risk called out in the Charter's risk table (Section 3.5).
 
 ## Setup
+
+### 1. Install Postgres and the pgvector extension
+
+```bash
+# macOS (Homebrew)
+brew install postgresql@16 pgvector
+
+# Ubuntu/Debian
+sudo apt-get install postgresql postgresql-16-pgvector
+```
+
+### 2. Create the database and enable the extension
+
+```bash
+sudo -u postgres psql -c "CREATE USER knowledgevault WITH PASSWORD 'knowledgevault';"
+sudo -u postgres psql -c "CREATE DATABASE knowledgevault OWNER knowledgevault;"
+```
+
+(`init_db.py` below runs `CREATE EXTENSION IF NOT EXISTS vector` for you,
+no need to do it by hand.)
+
+### 3. Python environment
 
 ```bash
 cd backend
@@ -41,32 +61,47 @@ source venv/bin/activate       # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-By default this uses a local SQLite file (`knowledgevault.db`, gitignored)
-so there's nothing to install to try it out. To point at real Postgres
-later, set an environment variable before running:
+Copy `.env.example` to `.env` (or just export the variable) if your
+Postgres isn't on `localhost:5432` with the default credentials above:
 
 ```bash
-export DATABASE_URL="postgresql://user:password@host:5432/knowledgevault"
+export DATABASE_URL="postgresql+psycopg2://knowledgevault:knowledgevault@localhost:5432/knowledgevault"
 ```
 
-## Create the tables
+### 4. Create the tables
 
 ```bash
 python init_db.py
 ```
 
-## Verify the schema works
+### 5. Run the server
 
 ```bash
-python test_models.py
+python main.py
 ```
 
-Inserts a document and a chunk, confirms the relationship works, then
-cleans up after itself. Should print "KV-7 schema check passed."
+Runs at `http://localhost:8000` (interactive docs at `/docs`).
+
+## Verify the pipeline works
+
+```bash
+python test_pipeline.py
+```
+
+Inserts a document, chunks and embeds it, confirms a similarity search
+against the stored vectors returns it, then cleans up. The first run
+downloads the embedding model (~90MB, one-time, cached after that), so it
+needs network access to huggingface.co.
+
+## Endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | Status check |
+| `POST /upload` | Upload a PDF or text file; persists it, chunks it, embeds each chunk |
+| `GET /documents` | List uploaded documents, most recent first (backs the KV-17 browse screen) |
 
 ## Next steps
 
-- Wire `POST /upload` (KV-6) to actually save a `Document` row instead of
-  just returning the extracted text
-- Roadmap Theme 2: chunking strategy, embedding generation, fill in the
-  `embedding` column for real
+- KV-16: `POST /search` - embed an incoming query, run `Chunk.embedding.cosine_distance(...)` against the stored vectors, return the top matches
+- KV-21: generate tags/summary at upload time and fill in `Document.tags` / `Document.summary`

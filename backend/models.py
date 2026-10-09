@@ -1,25 +1,26 @@
 """
-KnowledgeVault backend - KV-7: initial data model.
+KnowledgeVault backend - data model.
 
-Two tables for now, matching Section 5.1 / Roadmap Theme 1:
+Sprint 1 (KV-7) defined Document and Chunk with a placeholder embedding
+column. Sprint 2 (KV-15) replaces that placeholder with a real pgvector
+column now that the vector database choice is finalized: pgvector
+(a Postgres extension) rather than a separate managed vector service,
+since the team already runs Postgres for metadata and this avoids
+standing up and paying for a second system.
 
-- Document: one row per uploaded file (metadata + full extracted text).
-- Chunk: one row per text chunk of a document, the unit that will later
-  get an embedding for semantic search (Roadmap Theme 2). The embedding
-  column is a placeholder (nullable JSON/text) until the vector database
-  choice is finalized and wired in.
-
-A per-user "owner" column is deliberately left out of this first pass -
-authentication and per-user data isolation are Roadmap Theme 4 work, and
-adding it now would just mean re-migrating this schema later.
+EMBEDDING_DIM matches the output size of the chosen embedding model
+(sentence-transformers/all-MiniLM-L6-v2, see embeddings.py) - 384.
 """
 
 from datetime import datetime, timezone
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from database import Base
+
+EMBEDDING_DIM = 384
 
 
 def utcnow():
@@ -36,7 +37,7 @@ class Document(Base):
     extracted_text = Column(Text, nullable=True)
     uploaded_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
-    # Auto-tagging/summarization results (Roadmap Theme 2) land here once built.
+    # Auto-tagging/summarization results (KV-21) land here once built.
     tags = Column(Text, nullable=True)  # comma-separated for now; revisit if needed
     summary = Column(Text, nullable=True)
 
@@ -56,10 +57,8 @@ class Chunk(Base):
     chunk_index = Column(Integer, nullable=False)  # order within the document
     text = Column(Text, nullable=False)
 
-    # Placeholder for the embedding vector once Theme 2 picks a vector DB
-    # and embedding model. Stored as text (e.g. JSON-encoded) for now so
-    # this schema doesn't block on that decision.
-    embedding = Column(Text, nullable=True)
+    # Real embedding vector (KV-15), generated from `text` at ingest time.
+    embedding = Column(Vector(EMBEDDING_DIM), nullable=True)
 
     document = relationship("Document", back_populates="chunks")
 
