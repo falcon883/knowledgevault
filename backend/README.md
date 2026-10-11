@@ -10,9 +10,11 @@ Builds on Sprint 1 (KV-5/6/7). This sprint:
 - **KV-15**: each chunk is embedded locally (`embeddings.py`) and stored in
   a **pgvector** column for semantic similarity search.
 
+- **KV-16**: `POST /search` embeds a plain-language query and returns the
+  closest documents by meaning (pgvector cosine distance).
+
 Not yet wired in (separate Sprint 2 tickets): auto-tagging/summarization
-(KV-21), the `/search` endpoint (KV-16), and the frontend screens
-(KV-17/18/19).
+(KV-21) and the frontend screens (KV-17/18/19).
 
 ## Why pgvector + local embeddings
 
@@ -93,15 +95,58 @@ against the stored vectors returns it, then cleans up. The first run
 downloads the embedding model (~90MB, one-time, cached after that), so it
 needs network access to huggingface.co.
 
+## Search
+
+```bash
+python test_search.py
+```
+
+Uploads three small documents on different topics, searches them, and
+checks the right one ranks first. Cleans up after itself.
+
+Example request (also available in `/docs`):
+
+```json
+POST /search
+{ "query": "how old is the universe", "limit": 5 }
+```
+
+Response:
+
+```json
+{
+  "query": "how old is the universe",
+  "count": 1,
+  "results": [
+    {
+      "document_id": 3,
+      "filename": "notes.pdf",
+      "score": 0.6123,
+      "snippet": "The telescope observed a distant galaxy...",
+      "chunk_index": 0,
+      "tags": null,
+      "summary": null
+    }
+  ]
+}
+```
+
+- One result per document: its best-matching chunk, closest first.
+- `score` is cosine similarity (1.0 = same meaning, near 0 = unrelated).
+  Scores are relative, so use them for ordering rather than as a pass/fail
+  cutoff.
+- `limit` is 1 to 20 (default 5). A blank query returns 400.
+- `tags` and `summary` stay null until KV-21 is built.
+
 ## Endpoints
 
 | Endpoint | Purpose |
 |---|---|
 | `GET /health` | Status check |
 | `POST /upload` | Upload a PDF or text file; persists it, chunks it, embeds each chunk |
+| `POST /search` | Semantic search: returns the best-matching documents for a query |
 | `GET /documents` | List uploaded documents, most recent first (backs the KV-17 browse screen) |
 
 ## Next steps
 
-- KV-16: `POST /search` - embed an incoming query, run `Chunk.embedding.cosine_distance(...)` against the stored vectors, return the top matches
 - KV-21: generate tags/summary at upload time and fill in `Document.tags` / `Document.summary`

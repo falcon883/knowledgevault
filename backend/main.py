@@ -6,8 +6,9 @@ persist a document (KV-13), splits its text into chunks (KV-14), and
 embeds each chunk with a local sentence-transformers model, stored in a
 pgvector column (KV-15).
 
-Auto-tagging/summarization (KV-21) and the semantic search endpoint
-(KV-16) are separate Sprint 2 tickets, not yet wired in here.
+Sprint 2 also adds POST /search (KV-16): semantic search over the stored
+chunk embeddings. Auto-tagging/summarization (KV-21) is a separate ticket,
+not yet wired in here.
 """
 
 import io
@@ -15,18 +16,20 @@ from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 from pypdf import PdfReader
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from chunking import chunk_text
 from database import get_db
-from embeddings import embed_texts
+from embeddings import embed_text, embed_texts
 from models import Chunk, Document
 
 app = FastAPI(
     title="KnowledgeVault API",
     description="Backend service for the KnowledgeVault capstone project.",
-    version="0.3.0",
+    version="0.4.0",
 )
 
 app.add_middleware(
@@ -71,7 +74,7 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported file type '{file.content_type}'. "
-            f"Supported types: {', '.join(sorted(SUPPORTED_TYPES))}.",
+                   f"Supported types: {', '.join(sorted(SUPPORTED_TYPES))}.",
         )
 
     contents = await file.read()
@@ -146,7 +149,68 @@ def list_documents(db: Session = Depends(get_db)):
     ]
 
 
+class SearchRequest(BaseModel):
+    query: str = Field(..., max_length=500, description="What to look for, in plain language.")
+    limit: int = Field(5, ge=1, le=20, description="Maximum number of documents to return.")
+
+
+# How many of the closest chunks to pull before collapsing them to one
+# result per document. Larger than the max `limit` so a document with many
+# near-identical chunks can't crowd every other document out of the results.
+CANDIDATE_CHUNKS = 100
+SNIPPET_CHARS = 300
+
+
+@app.post("/search")
+def search_documents(request: SearchRequest, db: Session = Depends(get_db)):
+    """
+    Semantic search (KV-16). Embeds the query with the same model used at
+    upload time, finds the closest chunks by cosine distance in pgvector,
+    and returns one result per document: its best-matching chunk, a
+    similarity score (1.0 = identical meaning, around 0 = unrelated), and
+    the document's tags/summary. Backs the search screen (KV-18).
+    """
+    query = request.query.strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="Query must not be empty.")
+
+    query_vector = embed_text(query)
+    distance = Chunk.embedding.cosine_distance(query_vector)
+
+    rows = db.execute(
+        select(Chunk, distance.label("distance"))
+        .where(Chunk.embedding.is_not(None))
+        .order_by(distance)
+        .limit(CANDIDATE_CHUNKS)
+    ).all()
+
+    # Rows arrive closest-first, so the first chunk seen for a document is
+    # its best match. Keep that one and move on.
+    results = []
+    seen_documents = set()
+    for chunk, dist in rows:
+        if chunk.document_id in seen_documents:
+            continue
+        seen_documents.add(chunk.document_id)
+        doc = chunk.document
+        results.append(
+            {
+                "document_id": doc.id,
+                "filename": doc.filename,
+                "score": round(1 - float(dist), 4),
+                "snippet": chunk.text[:SNIPPET_CHARS],
+                "chunk_index": chunk.chunk_index,
+                "tags": doc.tags,
+                "summary": doc.summary,
+            }
+        )
+        if len(results) == request.limit:
+            break
+
+    return {"query": query, "count": len(results), "results": results}
+
+
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="localhost", port=8000, reload=True)
