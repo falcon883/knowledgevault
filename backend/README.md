@@ -13,8 +13,12 @@ Builds on Sprint 1 (KV-5/6/7). This sprint:
 - **KV-16**: `POST /search` embeds a plain-language query and returns the
   closest documents by meaning (pgvector cosine distance).
 
-Not yet wired in (separate Sprint 2 tickets): auto-tagging/summarization
-(KV-21) and the frontend screens (KV-17/18/19).
+- **KV-21**: every upload now gets automatic tags and a short summary
+  (`enrichment.py`), stored on the document and returned by `/upload`,
+  `/documents`, and `/search`.
+
+Not yet wired in (separate Sprint 2 tickets): the frontend screens
+(KV-17/18/19).
 
 ## Why pgvector + local embeddings
 
@@ -95,6 +99,26 @@ against the stored vectors returns it, then cleans up. The first run
 downloads the embedding model (~90MB, one-time, cached after that), so it
 needs network access to huggingface.co.
 
+## Tags and summaries
+
+Both run locally on the same embedding model as search, so there is no API
+key, cost, or extra service.
+
+- **Tags** (up to 5): candidate words and two-word phrases are pulled from
+  the text and ranked by how close they are in meaning to the whole
+  document, with a penalty so the list isn't five near-duplicates.
+- **Summary** (up to 3 sentences): the sentences closest in meaning to the
+  whole document, kept in their original order. It only reuses sentences
+  from the document, so it can't make anything up. Text with no real
+  sentences (schedules, tables) falls back to the first 300 characters.
+- If tagging ever fails, the upload still succeeds and the fields stay null.
+
+```bash
+python test_enrichment.py          # check it works
+python backfill_enrichment.py      # fill in documents uploaded before KV-21
+python backfill_enrichment.py --all  # redo every document
+```
+
 ## Search
 
 ```bash
@@ -136,17 +160,18 @@ Response:
   Scores are relative, so use them for ordering rather than as a pass/fail
   cutoff.
 - `limit` is 1 to 20 (default 5). A blank query returns 400.
-- `tags` and `summary` stay null until KV-21 is built.
+- `tags` (comma-separated) and `summary` come from KV-21. They are null
+  for documents uploaded before it, until you run `backfill_enrichment.py`.
 
 ## Endpoints
 
 | Endpoint | Purpose |
 |---|---|
 | `GET /health` | Status check |
-| `POST /upload` | Upload a PDF or text file; persists it, chunks it, embeds each chunk |
+| `POST /upload` | Upload a PDF or text file; persists it, chunks it, embeds each chunk, adds tags and a summary |
 | `POST /search` | Semantic search: returns the best-matching documents for a query |
 | `GET /documents` | List uploaded documents, most recent first (backs the KV-17 browse screen) |
 
 ## Next steps
 
-- KV-21: generate tags/summary at upload time and fill in `Document.tags` / `Document.summary`
+- Possible later improvement: swap the extractive summary for an LLM-written one if the team decides the API dependency is worth it

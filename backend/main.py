@@ -7,11 +7,12 @@ embeds each chunk with a local sentence-transformers model, stored in a
 pgvector column (KV-15).
 
 Sprint 2 also adds POST /search (KV-16): semantic search over the stored
-chunk embeddings. Auto-tagging/summarization (KV-21) is a separate ticket,
-not yet wired in here.
+chunk embeddings, and automatic tags plus a summary for each upload (KV-21,
+see enrichment.py).
 """
 
 import io
+import logging
 from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
@@ -24,12 +25,15 @@ from sqlalchemy.orm import Session
 from chunking import chunk_text
 from database import get_db
 from embeddings import embed_text, embed_texts
+from enrichment import enrich
 from models import Chunk, Document
+
+logger = logging.getLogger("knowledgevault")
 
 app = FastAPI(
     title="KnowledgeVault API",
     description="Backend service for the KnowledgeVault capstone project.",
-    version="0.4.0",
+    version="0.5.0",
 )
 
 app.add_middleware(
@@ -74,7 +78,7 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported file type '{file.content_type}'. "
-                   f"Supported types: {', '.join(sorted(SUPPORTED_TYPES))}.",
+            f"Supported types: {', '.join(sorted(SUPPORTED_TYPES))}.",
         )
 
     contents = await file.read()
@@ -102,6 +106,7 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
     db.refresh(document)
 
     chunk_texts = chunk_text(extracted_text)
+    chunk_vectors = []
     if chunk_texts:
         chunk_vectors = embed_texts(chunk_texts)
         for index, (text, vector) in enumerate(zip(chunk_texts, chunk_vectors)):
@@ -115,6 +120,16 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
             )
         db.commit()
 
+        # KV-21: tags and summary. The upload is already saved and searchable
+        # at this point, so a failure here is logged and skipped rather than
+        # turned into an error for the user.
+        try:
+            document.tags, document.summary = enrich(extracted_text, chunk_vectors)
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("Tagging/summarization failed for document %s", document.id)
+
     return {
         "id": document.id,
         "filename": document.filename,
@@ -122,6 +137,8 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         "size_bytes": document.size_bytes,
         "uploaded_at": document.uploaded_at.isoformat(),
         "chunk_count": len(chunk_texts),
+        "tags": document.tags,
+        "summary": document.summary,
         "status": "stored and embedded",
     }
 
@@ -213,4 +230,4 @@ def search_documents(request: SearchRequest, db: Session = Depends(get_db)):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="localhost", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
