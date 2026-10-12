@@ -8,7 +8,7 @@ pgvector column (KV-15).
 
 Sprint 2 also adds POST /search (KV-16): semantic search over the stored
 chunk embeddings, and automatic tags plus a summary for each upload (KV-21,
-see enrichment.py).
+see enrichment.py), and DELETE /documents/{id} to remove a document.
 """
 
 import io
@@ -33,7 +33,7 @@ logger = logging.getLogger("knowledgevault")
 app = FastAPI(
     title="KnowledgeVault API",
     description="Backend service for the KnowledgeVault capstone project.",
-    version="0.5.0",
+    version="0.6.0",
 )
 
 app.add_middleware(
@@ -78,7 +78,7 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported file type '{file.content_type}'. "
-            f"Supported types: {', '.join(sorted(SUPPORTED_TYPES))}.",
+                   f"Supported types: {', '.join(sorted(SUPPORTED_TYPES))}.",
         )
 
     contents = await file.read()
@@ -225,6 +225,22 @@ def search_documents(request: SearchRequest, db: Session = Depends(get_db)):
             break
 
     return {"query": query, "count": len(results), "results": results}
+
+
+@app.delete("/documents/{document_id}")
+def delete_document(document_id: int, db: Session = Depends(get_db)):
+    """
+    Delete a document and everything derived from it (its chunks and their
+    embeddings), so it no longer shows up in /documents or /search.
+    """
+    document = db.get(Document, document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+
+    filename = document.filename
+    db.delete(document)  # chunks go with it (cascade on Document.chunks)
+    db.commit()
+    return {"id": document_id, "filename": filename, "status": "deleted"}
 
 
 if __name__ == "__main__":
