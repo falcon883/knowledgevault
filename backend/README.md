@@ -132,7 +132,7 @@ Example request (also available in `/docs`):
 
 ```json
 POST /search
-{ "query": "how old is the universe", "limit": 5 }
+{ "query": "how old is the universe", "limit": 5, "min_score": 0.25 }
 ```
 
 Response:
@@ -160,6 +160,9 @@ Response:
   Scores are relative, so use them for ordering rather than as a pass/fail
   cutoff.
 - `limit` is 1 to 20 (default 5). A blank query returns 400.
+- `min_score` (default 0.25) hides weak matches so unrelated documents don't
+  pad the list. Send `0` to see everything. To change the default, edit
+  `MIN_SCORE` in `main.py`.
 - `tags` (comma-separated) and `summary` come from KV-21. They are null
   for documents uploaded before it, until you run `backfill_enrichment.py`.
 

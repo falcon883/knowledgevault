@@ -33,7 +33,7 @@ logger = logging.getLogger("knowledgevault")
 app = FastAPI(
     title="KnowledgeVault API",
     description="Backend service for the KnowledgeVault capstone project.",
-    version="0.6.0",
+    version="0.6.1",
 )
 
 app.add_middleware(
@@ -78,7 +78,7 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported file type '{file.content_type}'. "
-                   f"Supported types: {', '.join(sorted(SUPPORTED_TYPES))}.",
+            f"Supported types: {', '.join(sorted(SUPPORTED_TYPES))}.",
         )
 
     contents = await file.read()
@@ -166,9 +166,20 @@ def list_documents(db: Session = Depends(get_db)):
     ]
 
 
+# Results scoring below this are treated as noise and left out. Real matches
+# scored roughly 0.4 to 0.7 in testing, unrelated documents 0.2 or lower.
+MIN_SCORE = 0.25
+
+
 class SearchRequest(BaseModel):
     query: str = Field(..., max_length=500, description="What to look for, in plain language.")
     limit: int = Field(5, ge=1, le=20, description="Maximum number of documents to return.")
+    min_score: float = Field(
+        MIN_SCORE,
+        ge=0.0,
+        le=1.0,
+        description="Hide results less similar than this. Use 0 to see everything.",
+    )
 
 
 # How many of the closest chunks to pull before collapsing them to one
@@ -185,7 +196,9 @@ def search_documents(request: SearchRequest, db: Session = Depends(get_db)):
     upload time, finds the closest chunks by cosine distance in pgvector,
     and returns one result per document: its best-matching chunk, a
     similarity score (1.0 = identical meaning, around 0 = unrelated), and
-    the document's tags/summary. Backs the search screen (KV-18).
+    the document's tags/summary. Results below `min_score` (default 0.25)
+    are left out so unrelated documents don't pad the list. Backs the
+    search screen (KV-18).
     """
     query = request.query.strip()
     if not query:
@@ -209,12 +222,16 @@ def search_documents(request: SearchRequest, db: Session = Depends(get_db)):
         if chunk.document_id in seen_documents:
             continue
         seen_documents.add(chunk.document_id)
+        score = round(1 - float(dist), 4)
+        if score < request.min_score:
+            # Rows are closest-first, so everything after this is lower too.
+            break
         doc = chunk.document
         results.append(
             {
                 "document_id": doc.id,
                 "filename": doc.filename,
-                "score": round(1 - float(dist), 4),
+                "score": score,
                 "snippet": chunk.text[:SNIPPET_CHARS],
                 "chunk_index": chunk.chunk_index,
                 "tags": doc.tags,

@@ -50,7 +50,7 @@ try:
         ("did we stay under budget this quarter", "check_finance.txt"),
     ]
     for query, expected in cases:
-        r = client.post("/search", json={"query": query, "limit": 3})
+        r = client.post("/search", json={"query": query, "limit": 3, "min_score": 0})
         assert r.status_code == 200, r.text
         body = r.json()
         ours = [x for x in body["results"] if x["document_id"] in created]
@@ -60,6 +60,14 @@ try:
         assert ours == sorted(ours, key=lambda x: -x["score"]), "results not ranked"
         ids = [x["document_id"] for x in body["results"]]
         assert len(ids) == len(set(ids)), "same document returned twice"
+
+    # Low-scoring noise is hidden by default and shown when min_score is 0.
+    junk = "quantum chromodynamics and medieval falconry"
+    everything = client.post("/search", json={"query": junk, "min_score": 0}).json()
+    filtered = client.post("/search", json={"query": junk}).json()
+    assert filtered["count"] <= everything["count"]
+    assert all(x["score"] >= 0.25 for x in filtered["results"]), "default cutoff not applied"
+    print(f"Junk query: {everything['count']} results with min_score 0, {filtered['count']} by default")
 
     # Validation
     assert client.post("/search", json={"query": "   "}).status_code == 400
