@@ -52,6 +52,18 @@ export async function searchDocuments(query, limit = 10) {
 }
 
 /**
+ * Delete a document and everything derived from it (KV-22). The backend
+ * removes the document record plus its chunks and embeddings (cascade),
+ * so it disappears from /documents and /search alike.
+ */
+export async function deleteDocument(id) {
+  const res = await fetch(`${API_BASE}/documents/${id}`, {
+    method: 'DELETE',
+  });
+  return handleResponse(res, 'Delete');
+}
+
+/**
  * Backend liveness check for the header status indicator.
  */
 export async function checkHealth() {
