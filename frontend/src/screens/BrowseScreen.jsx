@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { listDocuments } from '../api.js';
+import { deleteDocument, listDocuments } from '../api.js';
 
 /**
  * KV-17 — Browse screen, wired to the live document list (GET /documents).
@@ -41,6 +41,10 @@ export default function BrowseScreen() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +81,30 @@ export default function BrowseScreen() {
   );
 
   const selected = docs.find((d) => d.id === selectedId) || null;
+
+  async function handleDelete() {
+    if (!selected || deleting) return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await deleteDocument(selected.id);
+      setDocs((prev) => prev.filter((d) => d.id !== selected.id));
+      setNotice(`Deleted "${selected.filename}".`);
+      setSelectedId(null);
+      setConfirmingDelete(false);
+    } catch (err) {
+      setDeleteError(err.message || 'Could not delete the document.');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function selectDoc(id) {
+    setSelectedId(selectedId === id ? null : id);
+    setConfirmingDelete(false);
+    setDeleteError('');
+    setNotice('');
+  }
 
   return (
     <section className="kv-card" aria-labelledby="browse-heading">
@@ -157,9 +185,7 @@ export default function BrowseScreen() {
                   key={d.id}
                   type="button"
                   className={`kv-doc${selectedId === d.id ? ' selected' : ''}`}
-                  onClick={() =>
-                    setSelectedId(selectedId === d.id ? null : d.id)
-                  }
+                  onClick={() => selectDoc(d.id)}
                   aria-expanded={selectedId === d.id}
                 >
                   <span className="kv-kind-badge">{kindOf(d)}</span>
@@ -212,6 +238,68 @@ export default function BrowseScreen() {
               )}
               {selected.summary && <p>{selected.summary}</p>}
               <span className="kv-meta">Source excerpt preview</span>
+
+              <div style={{ marginTop: '1rem' }}>
+                {!confirmingDelete ? (
+                  <button
+                    type="button"
+                    className="kv-btn kv-btn-danger"
+                    style={{ marginTop: 0 }}
+                    onClick={() => {
+                      setConfirmingDelete(true);
+                      setDeleteError('');
+                    }}
+                  >
+                    Delete document
+                  </button>
+                ) : (
+                  <div role="alert">
+                    <p className="kv-meta" style={{ marginBottom: '0.5rem' }}>
+                      Delete "{selected.filename}"? This removes it and its
+                      indexed content permanently.
+                    </p>
+                    <div className="kv-row">
+                      <button
+                        type="button"
+                        className="kv-btn kv-btn-danger"
+                        style={{ marginTop: 0 }}
+                        disabled={deleting}
+                        onClick={handleDelete}
+                      >
+                        {deleting ? 'Deleting…' : 'Yes, delete'}
+                      </button>
+                      <button
+                        type="button"
+                        className="kv-btn kv-btn-secondary"
+                        style={{ marginTop: 0 }}
+                        disabled={deleting}
+                        onClick={() => setConfirmingDelete(false)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {deleteError && (
+                  <div
+                    className="kv-status error"
+                    role="alert"
+                    style={{ marginTop: '0.75rem' }}
+                  >
+                    <strong>Could not delete.</strong> {deleteError}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {notice && (
+            <div
+              className="kv-status ok"
+              role="status"
+              style={{ marginTop: '1rem' }}
+            >
+              {notice}
             </div>
           )}
         </>

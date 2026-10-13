@@ -158,6 +158,20 @@
 
 .kv-btn-secondary:hover { background: #e2ebfd; }
 
+.kv-btn-danger {
+  background: #fdeeee;
+  color: #a1231f;
+  border: 1px solid #f3c1bf;
+}
+
+.kv-btn-danger:hover { background: #f9dcdc; }
+
+.kv-btn-danger:disabled {
+  background: #f6e3e2;
+  color: #c07a78;
+  cursor: not-allowed;
+}
+
 .kv-kind-toggle {
   display: flex;
   gap: 0.5rem;
