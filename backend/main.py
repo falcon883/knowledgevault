@@ -9,31 +9,62 @@ pgvector column (KV-15).
 Sprint 2 also adds POST /search (KV-16): semantic search over the stored
 chunk embeddings, and automatic tags plus a summary for each upload (KV-21,
 see enrichment.py), and DELETE /documents/{id} to remove a document.
+
+Sprint 3 starts with upload validation (KV-24, see uploads.py): every bad
+upload is rejected with a clear message before anything is saved. KV-26 adds
+what the refined Browse and Search screens need: GET /tags, tag/date/sort
+filters on GET /documents, and GET /documents/{id}.
 """
 
-import io
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import Literal
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from pypdf import PdfReader
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, defer
 
 from chunking import chunk_text
 from database import get_db
 from embeddings import embed_text, embed_texts
 from enrichment import enrich
+from init_db import upgrade_schema
 from models import Chunk, Document
+from uploads import (
+    MAX_UPLOAD_BYTES,
+    MAX_UPLOAD_MB,
+    UploadError,
+    check_size,
+    content_hash,
+    detect_kind,
+    extract_text,
+)
 
 logger = logging.getLogger("knowledgevault")
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Add any columns this version needs to an existing database (KV-25), so
+    # pulling new code never leaves the API running against an old schema.
+    try:
+        filled = upgrade_schema()
+        if filled:
+            logger.info("Backfilled content_hash for %d document(s)", filled)
+    except Exception:
+        logger.exception("Could not update the database schema; run python init_db.py")
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="KnowledgeVault API",
     description="Backend service for the KnowledgeVault capstone project.",
-    version="0.6.1",
+    version="0.9.0",
 )
 
 app.add_middleware(
@@ -43,7 +74,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SUPPORTED_TYPES = {"application/pdf", "text/plain"}
+@app.exception_handler(UploadError)
+async def upload_error_handler(request: Request, exc: UploadError):
+    """
+    All upload problems come back as {"detail": <message>, "code": <code>},
+    plus extra fields for a few codes (duplicate_document adds `existing`).
+    """
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "code": exc.code, **exc.extra},
+    )
 
 
 @app.get("/health")
@@ -53,62 +93,79 @@ def health_check():
         "status": "ok",
         "service": "knowledgevault-backend",
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "max_upload_mb": MAX_UPLOAD_MB,
     }
 
 
-def extract_text_from_pdf(contents: bytes) -> str:
-    reader = PdfReader(io.BytesIO(contents))
-    pages_text = [page.extract_text() or "" for page in reader.pages]
-    return "\n".join(pages_text).strip()
-
-
-def extract_text_from_plain(contents: bytes) -> str:
-    return contents.decode("utf-8", errors="replace").strip()
-
-
 @app.post("/upload")
-async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_document(
+    file: UploadFile | None = File(None),
+    allow_duplicate: bool = Query(
+        False, description="Store the file even if the same content is already uploaded."
+    ),
+    db: Session = Depends(get_db),
+):
     """
     Accept a document (PDF or plain text), extract its text, persist it
     as a Document, split it into Chunks, embed each chunk, and return the
-    saved document. This is the full Sprint 2 ingestion path: upload ->
-    extract -> persist -> chunk -> embed.
+    saved document. The full ingestion path: upload -> validate -> extract
+    -> chunk -> embed -> persist.
+
+    Validation (KV-24, see uploads.py) happens first and nothing is saved
+    unless the file passes. A file whose text matches a document already
+    stored is refused with 409 duplicate_document (KV-25) unless
+    `allow_duplicate=true` is passed. The document and its chunks are written in one
+    transaction, so a failure part way through leaves nothing behind.
     """
-    if file.content_type not in SUPPORTED_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type '{file.content_type}'. "
-            f"Supported types: {', '.join(sorted(SUPPORTED_TYPES))}.",
-        )
+    if file is None or not (file.filename or "").strip():
+        raise UploadError(400, "no_file", "No file was uploaded.")
 
-    contents = await file.read()
-    if not contents:
-        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    kind, content_type = detect_kind(file.filename, file.content_type)
 
-    try:
-        if file.content_type == "application/pdf":
-            extracted_text = extract_text_from_pdf(contents)
-        else:
-            extracted_text = extract_text_from_plain(contents)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=422, detail=f"Could not extract text from file: {exc}"
-        )
+    # Read one byte past the limit so an oversized file is caught without
+    # loading all of it into memory.
+    contents = await file.read(MAX_UPLOAD_BYTES + 1)
+    check_size(contents)
 
-    document = Document(
-        filename=file.filename,
-        content_type=file.content_type,
-        size_bytes=len(contents),
-        extracted_text=extracted_text,
-    )
-    db.add(document)
-    db.commit()
-    db.refresh(document)
+    extracted_text = extract_text(kind, contents)
+
+    # KV-25: refuse a re-upload before spending time embedding it.
+    text_hash = content_hash(extracted_text)
+    if not allow_duplicate:
+        existing = db.execute(
+            select(Document)
+            .where(Document.content_hash == text_hash)
+            .order_by(Document.id)
+            .options(defer(Document.extracted_text))
+            .limit(1)
+        ).scalar_one_or_none()
+        if existing is not None:
+            raise UploadError(
+                409,
+                "duplicate_document",
+                f"This looks like a file you already uploaded: \"{existing.filename}\".",
+                extra={
+                    "existing": {
+                        "id": existing.id,
+                        "filename": existing.filename,
+                        "uploaded_at": existing.uploaded_at.isoformat(),
+                    }
+                },
+            )
 
     chunk_texts = chunk_text(extracted_text)
-    chunk_vectors = []
-    if chunk_texts:
+
+    try:
         chunk_vectors = embed_texts(chunk_texts)
+        document = Document(
+            filename=file.filename,
+            content_type=content_type,
+            size_bytes=len(contents),
+            extracted_text=extracted_text,
+            content_hash=text_hash,
+        )
+        db.add(document)
+        db.flush()  # assigns document.id without committing yet
         for index, (text, vector) in enumerate(zip(chunk_texts, chunk_vectors)):
             db.add(
                 Chunk(
@@ -119,16 +176,25 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
                 )
             )
         db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Could not process upload %r", file.filename)
+        raise UploadError(
+            500,
+            "processing_failed",
+            "The file was read, but it could not be processed. Nothing was saved. Please try again.",
+        )
+    db.refresh(document)
 
-        # KV-21: tags and summary. The upload is already saved and searchable
-        # at this point, so a failure here is logged and skipped rather than
-        # turned into an error for the user.
-        try:
-            document.tags, document.summary = enrich(extracted_text, chunk_vectors)
-            db.commit()
-        except Exception:
-            db.rollback()
-            logger.exception("Tagging/summarization failed for document %s", document.id)
+    # KV-21: tags and summary. The upload is already saved and searchable
+    # at this point, so a failure here is logged and skipped rather than
+    # turned into an error for the user.
+    try:
+        document.tags, document.summary = enrich(extracted_text, chunk_vectors)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Tagging/summarization failed for document %s", document.id)
 
     return {
         "id": document.id,
@@ -143,27 +209,131 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
     }
 
 
+def parse_tags(tags: str | None) -> list[str]:
+    """Document.tags is stored as one comma-separated string."""
+    return [tag.strip() for tag in (tags or "").split(",") if tag.strip()]
+
+
+def document_summary(doc: Document, chunk_count: int) -> dict:
+    """The fields shown for a document in lists. Same shape as before KV-26."""
+    return {
+        "id": doc.id,
+        "filename": doc.filename,
+        "content_type": doc.content_type,
+        "size_bytes": doc.size_bytes,
+        "uploaded_at": doc.uploaded_at.isoformat(),
+        "tags": doc.tags,
+        "summary": doc.summary,
+        "chunk_count": chunk_count,
+    }
+
+
 @app.get("/documents")
-def list_documents(db: Session = Depends(get_db)):
+def list_documents(
+    tag: str | None = Query(
+        None, description="Only documents with this tag (exact match, ignoring case)."
+    ),
+    since: datetime | None = Query(
+        None,
+        description="Only documents uploaded at or after this date or time, "
+        "e.g. 2026-10-12 or 2026-10-12T09:30:00Z. A date or time with no "
+        "zone is read as UTC.",
+    ),
+    sort: Literal["newest", "oldest", "name"] = Query(
+        "newest", description="newest (default), oldest, or name (A to Z)."
+    ),
+    db: Session = Depends(get_db),
+):
     """
-    List uploaded documents (most recent first). Backs the browse screen
-    (KV-17) - deliberately minimal for now: no pagination/filtering yet,
-    since the corpus this sprint targets is small (Project Charter 2.3).
+    List uploaded documents. Backs the browse screen (KV-17). With no
+    parameters it returns everything, newest first, as it always has.
+    KV-26 adds optional filters: `tag`, `since`, and `sort`. They combine.
+    No pagination yet, since the corpus this project targets is small
+    (Project Charter 2.3).
     """
-    documents = db.query(Document).order_by(Document.uploaded_at.desc()).all()
+    query = (
+        select(Document, func.count(Chunk.id))
+        .outerjoin(Chunk, Chunk.document_id == Document.id)
+        .group_by(Document.id)
+        # The text can be large and the list never shows it.
+        .options(defer(Document.extracted_text))
+    )
+
+    if since is not None:
+        if since.tzinfo is None:
+            since = since.replace(tzinfo=timezone.utc)
+        query = query.where(Document.uploaded_at >= since)
+
+    if sort == "oldest":
+        query = query.order_by(Document.uploaded_at.asc(), Document.id.asc())
+    elif sort == "name":
+        query = query.order_by(func.lower(Document.filename).asc(), Document.id.asc())
+    else:
+        query = query.order_by(Document.uploaded_at.desc(), Document.id.desc())
+
+    wanted = (tag or "").strip().lower()
     return [
-        {
-            "id": doc.id,
-            "filename": doc.filename,
-            "content_type": doc.content_type,
-            "size_bytes": doc.size_bytes,
-            "uploaded_at": doc.uploaded_at.isoformat(),
-            "tags": doc.tags,
-            "summary": doc.summary,
-            "chunk_count": len(doc.chunks),
-        }
-        for doc in documents
+        document_summary(doc, chunk_count)
+        for doc, chunk_count in db.execute(query).all()
+        if not wanted or wanted in (t.lower() for t in parse_tags(doc.tags))
     ]
+
+
+@app.get("/documents/{document_id}")
+def get_document(
+    document_id: int,
+    max_chars: int | None = Query(
+        None,
+        ge=1,
+        le=1_000_000,
+        description="Cut the returned text to this many characters (for previews).",
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    One document in full (KV-26): the list fields plus its extracted text,
+    for previews. `truncated` is true when `max_chars` cut the text short;
+    `text_length` is always the full length.
+    """
+    document = db.get(Document, document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+
+    chunk_count = db.scalar(
+        select(func.count(Chunk.id)).where(Chunk.document_id == document_id)
+    )
+    text = document.extracted_text or ""
+    truncated = max_chars is not None and len(text) > max_chars
+    return {
+        **document_summary(document, chunk_count),
+        "extracted_text": text[:max_chars] if truncated else text,
+        "text_length": len(text),
+        "truncated": truncated,
+    }
+
+
+@app.get("/tags")
+def list_tags(
+    limit: int | None = Query(None, ge=1, le=500, description="Return only the top N tags."),
+    db: Session = Depends(get_db),
+):
+    """
+    Every tag in use with the number of documents that have it, most common
+    first (ties A to Z). Tags are matched ignoring case, so "Recipes" and
+    "recipes" count as one. Backs the tag filter on the browse screen (KV-26).
+    """
+    counts: dict[str, int] = {}
+    labels: dict[str, str] = {}
+    for tags in db.execute(select(Document.tags).where(Document.tags.is_not(None))).scalars():
+        for key in {tag.lower() for tag in parse_tags(tags)}:
+            counts[key] = counts.get(key, 0) + 1
+        for tag in parse_tags(tags):
+            labels.setdefault(tag.lower(), tag)
+
+    ordered = sorted(counts, key=lambda key: (-counts[key], key))
+    if limit is not None:
+        ordered = ordered[:limit]
+    return [{"tag": labels[key], "count": counts[key]} for key in ordered]
 
 
 # Results scoring below this are treated as noise and left out. Real matches

@@ -37,6 +37,11 @@ class Document(Base):
     extracted_text = Column(Text, nullable=True)
     uploaded_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
+    # KV-25: fingerprint of the extracted text (see uploads.content_hash), used
+    # to spot a file that was already uploaded. Null only for rows not yet
+    # backfilled by init_db.upgrade_schema().
+    content_hash = Column(String(64), nullable=True, index=True)
+
     # Auto-tagging/summarization results (KV-21) land here once built.
     tags = Column(Text, nullable=True)  # comma-separated for now; revisit if needed
     summary = Column(Text, nullable=True)

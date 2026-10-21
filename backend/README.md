@@ -1,5 +1,16 @@
 # KnowledgeVault Backend
 
+## Sprint 3: upload validation, duplicate detection, browse and preview API
+
+- **KV-24**: every bad upload is rejected with a clear message before
+  anything is saved (`uploads.py`). See [Upload errors](#upload-errors).
+- **KV-25**: uploading a file whose text is already stored is refused with
+  `409 duplicate_document`, pointing at the existing document. See
+  [Duplicate uploads](#duplicate-uploads).
+- **KV-26**: new endpoints for the refined Browse and Search screens:
+  `GET /tags`, `tag` / `since` / `sort` filters on `GET /documents`, and
+  `GET /documents/{id}` for previews. See [Endpoints](#endpoints).
+
 ## Sprint 2: ingestion pipeline + semantic search foundation
 
 Builds on Sprint 1 (KV-5/6/7). This sprint:
@@ -67,7 +78,7 @@ source venv/bin/activate       # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Copy `.env.example` to `.env` (or just export the variable) if your
+Copy `env.example` to `.env` (or just export the variable) if your
 Postgres isn't on `localhost:5432` with the default credentials above:
 
 ```bash
@@ -98,6 +109,66 @@ Inserts a document, chunks and embeds it, confirms a similarity search
 against the stored vectors returns it, then cleans up. The first run
 downloads the embedding model (~90MB, one-time, cached after that), so it
 needs network access to huggingface.co.
+
+## Upload errors
+
+`POST /upload` accepts PDF and plain text (`.txt`) files up to
+`MAX_UPLOAD_MB` (default 10; set it in `.env` or the environment). Anything
+else is rejected before it is saved, always in the same shape. `detail` is a
+plain-language message that can be shown to the user as is, and `code` is
+stable for the frontend to branch on:
+
+```json
+{"detail": "This file is larger than the 10 MB limit. Try a smaller file, or split it into parts.", "code": "file_too_large"}
+```
+
+| code | status | when |
+|---|---|---|
+| `no_file` | 400 | request had no file |
+| `unsupported_type` | 415 | not a PDF or plain text file |
+| `file_too_large` | 413 | bigger than `MAX_UPLOAD_MB` |
+| `empty_file` | 400 | zero bytes |
+| `unreadable_pdf` | 422 | damaged, or not really a PDF |
+| `password_protected_pdf` | 422 | PDF needs a password |
+| `unreadable_text` | 422 | not plain text (binary data) |
+| `no_text` | 422 | readable file, but no text in it (for example a scanned PDF) |
+| `duplicate_document` | 409 | same content as a document already stored (adds `existing`) |
+| `processing_failed` | 500 | text was fine, but saving or embedding failed; nothing is kept |
+
+A file sent with a generic type (`application/octet-stream` or none) is
+judged by its extension. `GET /health` reports the active limit as
+`max_upload_mb`.
+
+```bash
+python test_upload_validation.py
+```
+
+### Duplicate uploads
+
+Each document is stored with a fingerprint of its text (`content_hash`,
+SHA-256 of the extracted text with whitespace collapsed). If a new upload
+has the same fingerprint as a stored document it is refused before it is
+embedded or saved:
+
+```json
+{
+  "detail": "This looks like a file you already uploaded: \"notes.txt\".",
+  "code": "duplicate_document",
+  "existing": {"id": 12, "filename": "notes.txt", "uploaded_at": "2026-10-12T14:03:11+00:00"}
+}
+```
+
+So a renamed copy, or the same text with different spacing or line breaks,
+is caught too. To store it anyway, send `POST /upload?allow_duplicate=true`.
+Once every copy is deleted the content can be uploaded again.
+
+**After pulling this change, run `python init_db.py` once** (the server also
+does the same upgrade when it starts). It adds the `content_hash` column and
+fills it in for documents uploaded earlier. It is safe to re-run.
+
+```bash
+python test_duplicate_upload.py
+```
 
 ## Tags and summaries
 
@@ -173,7 +244,38 @@ Response:
 | `GET /health` | Status check |
 | `POST /upload` | Upload a PDF or text file; persists it, chunks it, embeds each chunk, adds tags and a summary |
 | `POST /search` | Semantic search: returns the best-matching documents for a query |
-| `GET /documents` | List uploaded documents, most recent first (backs the KV-17 browse screen) |
+| `GET /documents` | List uploaded documents (backs the browse screen). Optional filters below |
+| `GET /documents/{id}` | One document with its full extracted text, for previews |
+| `GET /tags` | Every tag in use with its document count, for the tag filter |
+| `DELETE /documents/{id}` | Delete a document and its chunks |
+
+### Browsing: `GET /documents`, `GET /documents/{id}`, `GET /tags`
+
+All parameters are optional and combine. With none, `GET /documents`
+behaves as before: everything, newest first.
+
+| Parameter | On | Meaning |
+|---|---|---|
+| `tag` | `/documents` | Only documents with this tag. Whole tag, ignoring case; blank is ignored |
+| `since` | `/documents` | Only documents uploaded at or after this date or time, e.g. `2026-10-12` or `2026-10-12T09:30:00Z`. No zone means UTC |
+| `sort` | `/documents` | `newest` (default), `oldest`, or `name` (A to Z, ignoring case) |
+| `max_chars` | `/documents/{id}` | Cut `extracted_text` to this many characters (1 to 1,000,000) |
+| `limit` | `/tags` | Return only the top N tags (1 to 500) |
+
+Each item in `GET /documents` has `id`, `filename`, `content_type`,
+`size_bytes`, `uploaded_at`, `tags`, `summary`, `chunk_count`.
+
+`GET /documents/{id}` returns those same fields plus `extracted_text`,
+`text_length` (always the full length) and `truncated` (true when
+`max_chars` cut the text). An unknown id gives 404 with
+`{"detail": "Document 7 not found."}`.
+
+`GET /tags` returns `[{"tag": "recipes", "count": 4}, ...]`, most common
+first (ties A to Z). "Recipes" and "recipes" count as one tag.
+
+```bash
+python test_browse_api.py
+```
 
 ## Next steps
 
