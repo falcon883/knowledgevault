@@ -210,6 +210,43 @@
   background: #f0f5ff;
 }
 
+.kv-drop.invalid {
+  border-color: #e02e2a;
+  background: #fff6f6;
+}
+
+.kv-field-error {
+  color: #a1231f;
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin: 0.45rem 0 0;
+}
+
+.kv-filebar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+  background: #f7faff;
+  border: 1px solid #e3ecff;
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+}
+
+.kv-filebar-name {
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.kv-text-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+}
+
 .kv-drop input[type="file"] {
   margin-top: 0.75rem;
 }
@@ -225,6 +262,7 @@
 .kv-status.info { background: #eef4ff; color: #1e3a8a; }
 .kv-status.ok { background: #e9f9ef; color: #0d6b32; }
 .kv-status.error { background: #fdeeee; color: #a1231f; }
+.kv-status.duplicate { background: #fff7e6; color: #7a4d00; }
 
 .kv-meta {
   font-size: 0.85rem;
@@ -246,15 +284,12 @@
 }
 
 .kv-doc {
+  position: relative;
   border: 1px solid #e3ecff;
   border-radius: 12px;
-  padding: 1rem 1.15rem;
-  cursor: pointer;
+  padding: 1rem 3rem 1rem 1.15rem;
   background: #fff;
-  text-align: left;
   width: 100%;
-  font: inherit;
-  color: inherit;
 }
 
 .kv-doc:hover { border-color: #b9cbe8; background: #fafcff; }
@@ -262,6 +297,61 @@
 .kv-doc.selected {
   border-color: #1d4ed8;
   box-shadow: 0 0 0 1px #1d4ed8;
+}
+
+.kv-doc-main {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.kv-doc-delete {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #93a1b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.kv-doc-delete:hover {
+  background: #fdeeee;
+  color: #a1231f;
+  border-color: #f3c1bf;
+}
+
+.kv-doc-delete svg { width: 1rem; height: 1rem; }
+
+.kv-doc-confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed #e3ecff;
+  font-size: 0.9rem;
+  color: #53657b;
+}
+
+.kv-btn-small {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  margin-top: 0;
 }
 
 .kv-doc-title {

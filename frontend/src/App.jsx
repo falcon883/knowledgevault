@@ -68,7 +68,7 @@ function App() {
       </header>
 
       <main className="kv-main">
-        <ActiveScreen key={tab} />
+        <ActiveScreen key={tab} onNavigate={setTab} />
       </main>
     </div>
   );
