@@ -3,6 +3,7 @@ import { checkHealth } from './api.js';
 import UploadScreen from './screens/UploadScreen.jsx';
 import BrowseScreen from './screens/BrowseScreen.jsx';
 import SearchScreen from './screens/SearchScreen.jsx';
+import { IconBookOpen, IconFolder, IconSearch, IconUploadCloud } from './icons.jsx';
 import './app.css';
 
 /**
@@ -15,9 +16,9 @@ import './app.css';
  */
 
 const TABS = [
-  { id: 'search', label: 'Search', Screen: SearchScreen },
-  { id: 'browse', label: 'Browse', Screen: BrowseScreen },
-  { id: 'capture', label: 'Capture', Screen: UploadScreen },
+  { id: 'search', label: 'Search', Screen: SearchScreen, Icon: IconSearch },
+  { id: 'browse', label: 'Browse', Screen: BrowseScreen, Icon: IconFolder },
+  { id: 'capture', label: 'Capture', Screen: UploadScreen, Icon: IconUploadCloud },
 ];
 
 function App() {
@@ -40,19 +41,28 @@ function App() {
   return (
     <div className="kv-shell">
       <header className="kv-topbar">
-        <div className="kv-brand">KnowledgeVault</div>
+        <div className="kv-brand">
+          <span className="kv-brand-mark">
+            <IconBookOpen size={20} />
+          </span>
+          KnowledgeVault
+        </div>
         <nav className="kv-nav" aria-label="Primary">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className="kv-tab"
-              aria-pressed={tab === t.id}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
+          {TABS.map((t) => {
+            const TabIcon = t.Icon;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                className="kv-tab"
+                aria-pressed={tab === t.id}
+                onClick={() => setTab(t.id)}
+              >
+                <TabIcon size={16} />
+                {t.label}
+              </button>
+            );
+          })}
         </nav>
         <span
           className={`kv-status-dot${backendOk == null ? '' : backendOk ? ' ok' : ' down'}`}

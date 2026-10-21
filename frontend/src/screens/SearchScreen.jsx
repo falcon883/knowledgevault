@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { searchDocuments } from '../api.js';
+import { IconAlertCircle, IconFile, IconFileText, IconSearch } from '../icons.jsx';
 
 /**
  * KV-18 — Search screen, wired to the semantic search endpoint (POST /search).
@@ -74,7 +75,10 @@ export default function SearchScreen() {
                 Searching…
               </>
             ) : (
-              'Search'
+              <>
+                <IconSearch size={16} />
+                Search
+              </>
             )}
           </button>
         </div>
@@ -82,11 +86,18 @@ export default function SearchScreen() {
 
       <div aria-live="polite" style={{ marginTop: '1.25rem' }}>
         {state === 'idle' && (
-          <div className="kv-empty">Enter a query to search your vault.</div>
+          <div className="kv-empty">
+            <span className="kv-empty-icon">
+              <IconSearch size={34} />
+            </span>
+            <br />
+            Enter a query to search your vault.
+          </div>
         )}
 
         {state === 'error' && (
           <div className="kv-status error" role="alert">
+            <IconAlertCircle size={17} />
             <strong>Search failed.</strong> {error} Is the backend running?
           </div>
         )}
@@ -112,7 +123,18 @@ export default function SearchScreen() {
                   aria-expanded={selectedId === r.document_id}
                 >
                   <div className="kv-row" style={{ justifyContent: 'space-between' }}>
-                    <span className="kv-doc-title">{r.filename}</span>
+                    <span className="kv-result-head">
+                      <span
+                        className={`kv-doc-icon small ${r.filename?.toLowerCase().endsWith('.pdf') ? 'pdf' : 'text'}`}
+                      >
+                        {r.filename?.toLowerCase().endsWith('.pdf') ? (
+                          <IconFile size={16} />
+                        ) : (
+                          <IconFileText size={16} />
+                        )}
+                      </span>
+                      <span className="kv-doc-title">{r.filename}</span>
+                    </span>
                     <span className="kv-score">
                       {Math.round((r.score || 0) * 100)}% match
                     </span>

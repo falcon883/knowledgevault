@@ -1,5 +1,17 @@
 import { useRef, useState } from 'react';
 import { uploadDocument } from '../api.js';
+import {
+  IconAlertCircle,
+  IconBookOpen,
+  IconCheckCircle,
+  IconCopy,
+  IconFile,
+  IconFileText,
+  IconFolder,
+  IconPen,
+  IconPlus,
+  IconUploadCloud,
+} from '../icons.jsx';
 
 /**
  * KV-19 — Capture / upload screen.
@@ -14,6 +26,7 @@ import { uploadDocument } from '../api.js';
  */
 
 const KINDS = ['PDF', 'Note', 'Article'];
+const KIND_ICONS = { PDF: IconFile, Note: IconPen, Article: IconBookOpen };
 
 // From the KV-24 upload validation story: files over the maximum size
 // are rejected with HTTP 413 and the limit stated in the message.
@@ -320,23 +333,27 @@ export default function UploadScreen({ onNavigate } = {}) {
       </p>
 
       <div className="kv-kind-toggle" role="group" aria-label="Document kind">
-        {KINDS.map((k) => (
-          <button
-            key={k}
-            type="button"
-            className="kv-kind-btn"
-            aria-pressed={kind === k}
-            onClick={() => {
-              setKind(k);
-              setFileError('');
-              setTextError('');
-              setFailure(null);
-              if (status === 'error') setStatus('idle');
-            }}
-          >
-            {k}
-          </button>
-        ))}
+        {KINDS.map((k) => {
+          const KindIcon = KIND_ICONS[k];
+          return (
+            <button
+              key={k}
+              type="button"
+              className="kv-kind-btn"
+              aria-pressed={kind === k}
+              onClick={() => {
+                setKind(k);
+                setFileError('');
+                setTextError('');
+                setFailure(null);
+                if (status === 'error') setStatus('idle');
+              }}
+            >
+              <KindIcon size={15} />
+              {k}
+            </button>
+          );
+        })}
       </div>
 
       <label className="kv-label" htmlFor="kv-title">
@@ -378,6 +395,9 @@ export default function UploadScreen({ onNavigate } = {}) {
               if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click();
             }}
           >
+            <span className="kv-drop-icon">
+              <IconUploadCloud size={30} />
+            </span>
             <p>{file ? file.name : 'Drop a PDF here, or click to choose one'}</p>
             <p className="kv-meta">PDF files only, up to {MAX_FILE_LABEL}.</p>
             <input
@@ -399,6 +419,7 @@ export default function UploadScreen({ onNavigate } = {}) {
           )}
           {file && !fileError && (
             <div className="kv-filebar">
+              <IconFileText size={17} />
               <span className="kv-filebar-name">{file.name}</span>
               <span className="kv-meta">{formatBytes(file.size)}</span>
               <button
@@ -434,6 +455,7 @@ export default function UploadScreen({ onNavigate } = {}) {
               className="kv-btn kv-btn-secondary kv-btn-small"
               onClick={() => textInputRef.current?.click()}
             >
+              <IconFileText size={15} />
               Choose a .txt file
             </button>
             <input
@@ -487,6 +509,7 @@ export default function UploadScreen({ onNavigate } = {}) {
         )}
         {status === 'ready' && result && (
           <div className="kv-status ok">
+            <IconCheckCircle size={17} />
             <strong>Saved.</strong> “{result.filename}” is indexed
             {result.chunk_count != null && ` (${result.chunk_count} chunks)`}.
             {tags.length > 0 && (
@@ -509,6 +532,7 @@ export default function UploadScreen({ onNavigate } = {}) {
                   style={{ marginTop: 0 }}
                   onClick={() => onNavigate('browse')}
                 >
+                  <IconFolder size={15} />
                   View in Browse
                 </button>
               )}
@@ -518,6 +542,7 @@ export default function UploadScreen({ onNavigate } = {}) {
                 style={{ marginTop: 0 }}
                 onClick={reset}
               >
+                <IconPlus size={15} />
                 Add another
               </button>
             </div>
@@ -525,6 +550,11 @@ export default function UploadScreen({ onNavigate } = {}) {
         )}
         {status === 'error' && failure && (
           <div className={`kv-status ${failure.tone === 'duplicate' ? 'duplicate' : 'error'}`}>
+            {failure.tone === 'duplicate' ? (
+              <IconCopy size={17} />
+            ) : (
+              <IconAlertCircle size={17} />
+            )}
             <strong>{failure.heading}</strong> {failure.message}
             <div className="kv-row" style={{ marginTop: '0.75rem' }}>
               {failure.retry && (
@@ -545,6 +575,7 @@ export default function UploadScreen({ onNavigate } = {}) {
                   style={{ marginTop: 0 }}
                   onClick={() => onNavigate('browse')}
                 >
+                  <IconFolder size={15} />
                   View in Browse
                 </button>
               )}

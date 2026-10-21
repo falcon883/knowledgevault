@@ -22,6 +22,20 @@
   font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: -0.03em;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.kv-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 9px;
+  background: #1d4ed8;
+  color: #fff;
 }
 
 .kv-nav {
@@ -39,6 +53,9 @@
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .kv-tab:hover {
@@ -141,6 +158,10 @@
   font-weight: 600;
   cursor: pointer;
   margin-top: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
 }
 
 .kv-btn:hover { background: #1a45bd; }
@@ -187,6 +208,9 @@
   font-size: 0.92rem;
   cursor: pointer;
   color: #3c4f66;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .kv-kind-btn[aria-pressed="true"] {
@@ -300,7 +324,9 @@
 }
 
 .kv-doc-main {
-  display: block;
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
   width: 100%;
   border: none;
   background: none;
@@ -309,6 +335,11 @@
   text-align: left;
   font: inherit;
   color: inherit;
+}
+
+.kv-doc-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .kv-doc-delete {
@@ -476,6 +507,75 @@
 }
 
 @keyframes kv-spin { to { transform: rotate(360deg); } }
+
+/* Icon system (src/icons.jsx) */
+.kv-icon {
+  flex: none;
+  vertical-align: -0.18em;
+}
+
+.kv-status .kv-icon {
+  margin-right: 0.35rem;
+  vertical-align: -0.22em;
+}
+
+.kv-drop-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 50%;
+  background: #e7efff;
+  color: #1d4ed8;
+  margin-bottom: 0.35rem;
+}
+
+.kv-drop.invalid .kv-drop-icon {
+  background: #fdeeee;
+  color: #a1231f;
+}
+
+.kv-doc-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 10px;
+  flex: none;
+}
+
+.kv-doc-icon.pdf { background: #e7efff; color: #1d4ed8; }
+.kv-doc-icon.text { background: #f1eafd; color: #6d28d9; }
+
+.kv-doc-icon.small {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+}
+
+.kv-result-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  text-align: left;
+}
+
+.kv-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.2rem;
+  height: 4.2rem;
+  border-radius: 50%;
+  background: #eef4ff;
+  color: #1d4ed8;
+  margin-bottom: 0.5rem;
+}
+
+.kv-filebar .kv-icon { color: #1d4ed8; }
 
 @media (max-width: 640px) {
   .kv-card { padding: 1.25rem; }
