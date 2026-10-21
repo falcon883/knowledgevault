@@ -7,6 +7,9 @@
 - **KV-25**: uploading a file whose text is already stored is refused with
   `409 duplicate_document`, pointing at the existing document. See
   [Duplicate uploads](#duplicate-uploads).
+- **KV-33**: the API stays responsive during uploads, and the embedding
+  model is loaded when the server starts. See
+  [Responsiveness and startup](#responsiveness-and-startup).
 - **KV-26**: new endpoints for the refined Browse and Search screens:
   `GET /tags`, `tag` / `since` / `sort` filters on `GET /documents`, and
   `GET /documents/{id}` for previews. See [Endpoints](#endpoints).
@@ -99,6 +102,11 @@ python main.py
 
 Runs at `http://localhost:8000` (interactive docs at `/docs`).
 
+On start the server loads the embedding model (a few seconds; the very first
+run also downloads it, about 90 MB), so it is ready before the first request.
+The log line `Embedding model loaded in X.Xs` shows when it is. `GET /health`
+reports `"model_loaded": true` once it is.
+
 ## Verify the pipeline works
 
 ```bash
@@ -168,6 +176,23 @@ fills it in for documents uploaded earlier. It is safe to re-run.
 
 ```bash
 python test_duplicate_upload.py
+```
+
+## Responsiveness and startup
+
+`POST /upload` does its slow work (reading the PDF, chunking, embedding,
+saving, tagging) on a worker thread, so searches and browsing keep working
+while a large file is processed. Embedding is done a few chunks at a time
+(`BATCH_SIZE` in `embeddings.py`), so a search that arrives mid-upload waits
+for one small batch rather than the whole file.
+
+If the model can't be loaded at startup (for example, the first run is
+offline), the server still starts, logs the error, and tries again on first
+use.
+
+```bash
+python test_responsiveness.py      # no model needed; checks searches during an upload
+python bench_responsiveness.py     # real timings, against a running server (python main.py)
 ```
 
 ## Tags and summaries

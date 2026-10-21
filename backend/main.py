@@ -13,7 +13,9 @@ see enrichment.py), and DELETE /documents/{id} to remove a document.
 Sprint 3 starts with upload validation (KV-24, see uploads.py): every bad
 upload is rejected with a clear message before anything is saved. KV-26 adds
 what the refined Browse and Search screens need: GET /tags, tag/date/sort
-filters on GET /documents, and GET /documents/{id}.
+filters on GET /documents, and GET /documents/{id}. KV-25 refuses duplicate
+uploads. KV-33 keeps the API responsive during uploads (the work runs on a
+worker thread) and loads the embedding model at startup.
 """
 
 import logging
@@ -23,11 +25,13 @@ from typing import Literal
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, defer
 
+import embeddings
 from chunking import chunk_text
 from database import get_db
 from embeddings import embed_text, embed_texts
@@ -57,6 +61,15 @@ async def lifespan(_app: FastAPI):
             logger.info("Backfilled content_hash for %d document(s)", filled)
     except Exception:
         logger.exception("Could not update the database schema; run python init_db.py")
+
+    # KV-33: load the embedding model now rather than on the first request.
+    # If it can't be loaded (say, the first run is offline), start anyway and
+    # try again on first use.
+    try:
+        seconds = await run_in_threadpool(embeddings.load_model)
+        logger.info("Embedding model loaded in %.1fs", seconds)
+    except Exception:
+        logger.exception("Could not load the embedding model at startup; will retry on first use")
     yield
 
 
@@ -64,7 +77,7 @@ app = FastAPI(
     lifespan=lifespan,
     title="KnowledgeVault API",
     description="Backend service for the KnowledgeVault capstone project.",
-    version="0.9.0",
+    version="0.10.0",
 )
 
 app.add_middleware(
@@ -94,6 +107,7 @@ def health_check():
         "service": "knowledgevault-backend",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "max_upload_mb": MAX_UPLOAD_MB,
+        "model_loaded": embeddings.is_loaded(),
     }
 
 
@@ -127,6 +141,24 @@ async def upload_document(
     contents = await file.read(MAX_UPLOAD_BYTES + 1)
     check_size(contents)
 
+    # Everything from here is slow and blocking (PDF parsing, embedding,
+    # database writes, tagging). Run it on a worker thread so the server keeps
+    # answering other requests, searches included, while a file is processed
+    # (KV-33).
+    return await run_in_threadpool(
+        ingest_document, db, file.filename, content_type, kind, contents, allow_duplicate
+    )
+
+
+def ingest_document(
+    db: Session,
+    filename: str,
+    content_type: str,
+    kind: str,
+    contents: bytes,
+    allow_duplicate: bool,
+) -> dict:
+    """The blocking part of an upload: extract, de-duplicate, chunk, embed, save, tag."""
     extracted_text = extract_text(kind, contents)
 
     # KV-25: refuse a re-upload before spending time embedding it.
@@ -158,7 +190,7 @@ async def upload_document(
     try:
         chunk_vectors = embed_texts(chunk_texts)
         document = Document(
-            filename=file.filename,
+            filename=filename,
             content_type=content_type,
             size_bytes=len(contents),
             extracted_text=extracted_text,
@@ -178,7 +210,7 @@ async def upload_document(
         db.commit()
     except Exception:
         db.rollback()
-        logger.exception("Could not process upload %r", file.filename)
+        logger.exception("Could not process upload %r", filename)
         raise UploadError(
             500,
             "processing_failed",
