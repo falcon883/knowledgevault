@@ -49,6 +49,16 @@ export async function listDocuments() {
 }
 
 /**
+ * Fetch one document's full record (KV-30). The list endpoint returns
+ * summary fields only, so the Browse detail pane loads the full record
+ * on selection to show the real source excerpt.
+ */
+export async function getDocument(id) {
+  const res = await fetch(`${API_BASE}/documents/${id}`);
+  return handleResponse(res, 'Could not load document');
+}
+
+/**
  * Semantic search over the vault (KV-18). Returns ranked results, one per
  * document, each with its best-matching snippet, similarity score, tags and
  * summary.
