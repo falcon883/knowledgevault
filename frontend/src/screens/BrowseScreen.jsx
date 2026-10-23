@@ -23,6 +23,11 @@ import {
  * loads the document's full record (GET /documents/{id}) and shows its
  * real source excerpt, and the pane closes when a filter change hides
  * the selected document.
+ *
+ * Layout — master-detail: the list sits on the left and the detail pane
+ * lives in a sticky right-hand column (a vault overview sits there while
+ * nothing is selected), so the excerpt is never buried at the bottom of
+ * a long list.
  */
 
 function kindOf(doc) {
@@ -58,14 +63,33 @@ function formatDate(iso) {
  */
 function excerptOf(record) {
   if (!record) return '';
-  const raw = [
+  let raw = [
     record.excerpt,
     record.text_preview,
     record.preview,
     record.snippet,
     record.text,
     record.content,
+    record.extracted_text,
+    record.raw_text,
+    record.text_content,
+    record.page_content,
+    record.body,
+    record.first_chunk,
+    record.first_chunk_text,
   ].find((v) => typeof v === 'string' && v.trim());
+  // Some backend shapes embed the chunks in the document record instead
+  // of exposing a flat text field; fall back to the first chunk's text.
+  if (!raw && Array.isArray(record.chunks) && record.chunks.length > 0) {
+    const first = record.chunks[0];
+    if (typeof first === 'string') {
+      raw = first;
+    } else if (first && typeof first === 'object') {
+      raw = [first.text, first.content, first.snippet, first.page_content].find(
+        (v) => typeof v === 'string' && v.trim(),
+      );
+    }
+  }
   if (!raw) return '';
   const clean = raw.replace(/\s+/g, ' ').trim();
   return clean.length > 600 ? `${clean.slice(0, 600).trimEnd()}…` : clean;
@@ -164,6 +188,17 @@ export default function BrowseScreen() {
   }, [selectedKey]);
 
   const excerpt = useMemo(() => excerptOf(detail), [detail]);
+
+  // Vault totals for the overview panel shown while nothing is selected.
+  const stats = useMemo(
+    () => ({
+      pdfs: docs.filter((d) => kindOf(d) === 'PDF').length,
+      texts: docs.filter((d) => kindOf(d) === 'Text').length,
+      chunks: docs.reduce((sum, d) => sum + (d.chunk_count || 0), 0),
+      size: docs.reduce((sum, d) => sum + (d.size_bytes || 0), 0),
+    }),
+    [docs],
+  );
 
   async function handleDelete(doc) {
     if (!doc || deleting) return;
@@ -264,6 +299,8 @@ export default function BrowseScreen() {
             </div>
           )}
 
+          <div className="kv-browse-layout">
+            <div className="kv-browse-main">
           {visible.length === 0 ? (
             <div className="kv-empty">
               {docs.length === 0 ? (
@@ -377,7 +414,20 @@ export default function BrowseScreen() {
             </div>
           )}
 
-          {selected && (
+          {notice && (
+            <div
+              className="kv-status ok"
+              role="status"
+              style={{ marginTop: '1rem' }}
+            >
+              <IconCheckCircle size={17} />
+              {notice}
+            </div>
+          )}
+            </div>
+
+            <aside className="kv-detail-col">
+          {selected ? (
             <div className="kv-detail" aria-live="polite">
               <h3>{selected.filename}</h3>
               <div className="kv-detail-grid">
@@ -430,18 +480,36 @@ export default function BrowseScreen() {
                   ))}
               </div>
             </div>
-          )}
-
-          {notice && (
-            <div
-              className="kv-status ok"
-              role="status"
-              style={{ marginTop: '1rem' }}
-            >
-              <IconCheckCircle size={17} />
-              {notice}
+          ) : (
+            <div className="kv-detail kv-overview">
+              <h3>Vault overview</h3>
+              <div className="kv-detail-grid">
+                <div className="kv-detail-item">
+                  <div className="k">Documents</div>
+                  <div className="v">{docs.length}</div>
+                </div>
+                <div className="kv-detail-item">
+                  <div className="k">PDFs</div>
+                  <div className="v">{stats.pdfs}</div>
+                </div>
+                <div className="kv-detail-item">
+                  <div className="k">Text files</div>
+                  <div className="v">{stats.texts}</div>
+                </div>
+                <div className="kv-detail-item">
+                  <div className="k">Chunks indexed</div>
+                  <div className="v">{stats.chunks}</div>
+                </div>
+              </div>
+              <p className="kv-meta">
+                Select any document in the list and its details and source
+                excerpt appear here. This panel stays in view while you
+                scroll, however long the list gets.
+              </p>
             </div>
           )}
+            </aside>
+          </div>
         </>
       )}
     </section>

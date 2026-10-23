@@ -566,10 +566,37 @@
 
 .kv-chip.active .kv-chip-count { background: rgba(255, 255, 255, 0.28); }
 
+/* --- Browse master-detail layout --------------------------------------------- */
+
+.kv-browse-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 370px;
+  gap: 1.25rem;
+  align-items: start;
+  margin-top: 1rem;
+}
+
+.kv-browse-main { min-width: 0; }
+
+.kv-browse-main .kv-doc-list { margin-top: 0; }
+
+.kv-detail-col {
+  position: sticky;
+  top: 5.4rem;
+  max-height: calc(100vh - 6.8rem);
+  overflow-y: auto;
+}
+
+@media (max-width: 980px) {
+  .kv-browse-layout { grid-template-columns: 1fr; }
+  .kv-detail-col { position: static; max-height: none; order: -1; }
+  .kv-overview { display: none; }
+}
+
 /* --- Detail pane / excerpt --------------------------------------------------- */
 
 .kv-detail {
-  margin-top: 1.25rem;
+  margin-top: 0;
   border: 1px solid #e3ecff;
   border-radius: 14px;
   background: #f7faff;
