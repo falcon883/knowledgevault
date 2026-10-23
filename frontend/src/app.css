@@ -1,32 +1,37 @@
-/* KnowledgeVault app styles — dark wireframe theme.
-   Layout and look follow the team's wireframes: near-black background,
-   hairline borders, left sidebar nav, flat list rows (no cards).
-   Screens: KV-19 Capture, KV-17/KV-30 Browse, KV-18 Search. */
+/* KnowledgeVault app styles — white-and-blue theme on the wireframe layout.
+   Slim top bar over a left sidebar nav; soft gradients, rounded panels and
+   gentle shadows keep it smooth. Screens: KV-19 Capture, KV-17/KV-30
+   Browse, KV-18 Search. */
 
 .kv-shell {
   min-height: 100vh;
-  background: #161616;
-  color: #ececec;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+  color: #122033;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 /* --- Top bar ------------------------------------------------------------ */
 
 .kv-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
-  padding: 0.85rem 1.25rem;
-  border-bottom: 1px solid #333;
+  padding: 0.8rem 1.4rem;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #e3ecff;
 }
 
 .kv-brand {
-  font-size: 0.95rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: #f5f5f5;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #122033;
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -36,12 +41,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border: 1px solid #444;
-  border-radius: 4px;
-  background: #1e1e1e;
-  color: #ddd;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.35);
 }
 
 .kv-top-right {
@@ -52,7 +57,7 @@
 
 .kv-archive {
   font-size: 0.85rem;
-  color: #9a9a9a;
+  color: #5b6d84;
 }
 
 .kv-status-dot {
@@ -60,89 +65,95 @@
   align-items: center;
   gap: 0.45rem;
   font-size: 0.8rem;
-  color: #9a9a9a;
+  color: #5b6d84;
 }
 
 .kv-status-dot i {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  background: #777;
+  background: #9aa7b8;
   display: inline-block;
 }
 
-.kv-status-dot.ok i { background: #4caf6d; }
-.kv-status-dot.down i { background: #d9534f; }
+.kv-status-dot.ok i { background: #00a240; box-shadow: 0 0 0 3px rgba(0, 162, 64, 0.15); }
+.kv-status-dot.down i { background: #e02e2a; box-shadow: 0 0 0 3px rgba(224, 46, 42, 0.12); }
 
 /* --- Sidebar + content --------------------------------------------------- */
 
 .kv-body {
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .kv-nav {
+  position: sticky;
+  top: 4.2rem;
   flex: none;
-  width: 190px;
+  width: 205px;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  padding: 1.1rem 0.9rem;
-  border-right: 1px solid #333;
+  gap: 0.45rem;
+  padding: 1.4rem 0.9rem;
 }
 
 .kv-tab {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   width: 100%;
-  border: 1px solid #4a4a4a;
+  border: 1px solid transparent;
   background: transparent;
-  color: #ddd;
-  padding: 0.6rem 1rem;
-  border-radius: 4px;
+  color: #44546a;
+  padding: 0.65rem 1rem;
+  border-radius: 12px;
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  text-align: center;
+  text-align: left;
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .kv-tab:hover {
-  background: #1f1f1f;
-  border-color: #6d6d6d;
+  background: #e7efff;
+  color: #183153;
 }
 
 .kv-tab[aria-pressed="true"] {
-  background: #f2f2f2;
-  border-color: #f2f2f2;
-  color: #111;
-  font-weight: 600;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(29, 78, 216, 0.3);
 }
 
 .kv-main {
   flex: 1;
   min-width: 0;
-  max-width: 1020px;
-  padding: 1.75rem 2rem 4rem;
+  padding: 1.6rem 1.6rem 4rem 0.6rem;
 }
 
 /* --- Screen scaffolding -------------------------------------------------- */
 
 .kv-card {
-  background: transparent;
-  border: none;
-  padding: 0;
+  background: #fff;
+  border: 1px solid #e3ecff;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+  padding: 1.75rem;
   margin-bottom: 1.25rem;
 }
 
 .kv-card h2 {
   margin: 0 0 0.4rem;
-  font-size: 1.35rem;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  color: #f5f5f5;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  color: #122033;
 }
 
 .kv-lede {
-  color: #a8a8a8;
+  color: #53657b;
   margin: 0 0 1.25rem;
   line-height: 1.55;
 }
@@ -151,7 +162,7 @@
   display: block;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #cfcfcf;
+  color: #3c4f66;
   margin: 1rem 0 0.4rem;
 }
 
@@ -164,7 +175,7 @@
 
 .kv-meta {
   font-size: 0.85rem;
-  color: #999;
+  color: #6b7d94;
 }
 
 /* --- Forms --------------------------------------------------------------- */
@@ -173,12 +184,13 @@
 .kv-textarea,
 .kv-select {
   width: 100%;
-  border: 1px solid #454545;
-  border-radius: 4px;
-  padding: 0.65rem 0.8rem;
+  border: 1px solid #c9d6ea;
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
   font: inherit;
-  background: #1e1e1e;
-  color: #eee;
+  background: #fff;
+  color: inherit;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .kv-textarea {
@@ -187,9 +199,10 @@
   line-height: 1.5;
 }
 
-.kv-input::placeholder,
-.kv-textarea::placeholder {
-  color: #777;
+.kv-input:hover,
+.kv-textarea:hover,
+.kv-select:hover {
+  border-color: #a9c0e4;
 }
 
 .kv-input:focus-visible,
@@ -197,17 +210,17 @@
 .kv-select:focus-visible,
 .kv-tab:focus-visible,
 .kv-btn:focus-visible {
-  outline: 2px solid #d6d6d6;
+  outline: 2px solid #1d4ed8;
   outline-offset: 2px;
 }
 
 .kv-btn {
-  border: 1px solid #f2f2f2;
-  border-radius: 4px;
-  background: #f2f2f2;
-  color: #111;
-  padding: 0.65rem 1.3rem;
-  font-size: 0.95rem;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #fff;
+  padding: 0.8rem 1.4rem;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   margin-top: 1.25rem;
@@ -215,37 +228,40 @@
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
+  box-shadow: 0 6px 16px rgba(29, 78, 216, 0.25);
+  transition: filter 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
-.kv-btn:hover { background: #fff; }
+.kv-btn:hover { filter: brightness(1.07); }
+.kv-btn:active { transform: translateY(1px); }
 
 .kv-btn:disabled {
-  background: #3a3a3a;
-  border-color: #3a3a3a;
-  color: #888;
+  background: #9db4e8;
+  box-shadow: none;
   cursor: not-allowed;
 }
 
 .kv-btn-secondary {
-  background: transparent;
-  color: #ddd;
-  border: 1px solid #555;
+  background: #eef3fd;
+  color: #183153;
+  border: 1px solid #cfe0ff;
+  box-shadow: none;
 }
 
-.kv-btn-secondary:hover { background: #1f1f1f; border-color: #888; }
+.kv-btn-secondary:hover { background: #e2ebfd; filter: none; }
 
 .kv-btn-danger {
-  background: transparent;
-  color: #f0a3a0;
-  border: 1px solid #7a3a38;
+  background: #fdeeee;
+  color: #a1231f;
+  border: 1px solid #f3c1bf;
+  box-shadow: none;
 }
 
-.kv-btn-danger:hover { background: #2a1a1a; }
+.kv-btn-danger:hover { background: #f9dcdc; filter: none; }
 
 .kv-btn-danger:disabled {
-  background: transparent;
-  color: #8a605e;
-  border-color: #4a3230;
+  background: #f6e3e2;
+  color: #c07a78;
   cursor: not-allowed;
 }
 
@@ -264,47 +280,48 @@
 }
 
 .kv-kind-btn {
-  border: 1px solid #4a4a4a;
-  background: transparent;
-  border-radius: 4px;
+  border: 1px solid #c9d6ea;
+  background: #fff;
+  border-radius: 10px;
   padding: 0.55rem 1.1rem;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 0.92rem;
   cursor: pointer;
-  color: #ddd;
+  color: #3c4f66;
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
 }
 
-.kv-kind-btn:hover { border-color: #6d6d6d; background: #1f1f1f; }
+.kv-kind-btn:hover { border-color: #1d4ed8; color: #183153; }
 
 .kv-kind-btn[aria-pressed="true"] {
-  background: #f2f2f2;
-  border-color: #f2f2f2;
-  color: #111;
-  font-weight: 600;
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #fff;
 }
 
 .kv-drop {
-  border: 2px dashed #555;
-  border-radius: 4px;
+  border: 2px dashed #b9cbe8;
+  border-radius: 14px;
   padding: 1.75rem 1rem;
   text-align: center;
-  color: #a8a8a8;
+  color: #53657b;
   margin-top: 0.4rem;
   cursor: pointer;
-  background: #1b1b1b;
+  background: #fbfdff;
+  transition: border-color 0.18s ease, background 0.18s ease;
 }
 
 .kv-drop.dragging {
-  border-color: #ddd;
-  background: #222;
+  border-color: #1d4ed8;
+  background: #f0f5ff;
 }
 
 .kv-drop.invalid {
-  border-color: #b0524f;
-  background: #241818;
+  border-color: #e02e2a;
+  background: #fff6f6;
 }
 
 .kv-drop-icon {
@@ -314,14 +331,14 @@
   width: 3.6rem;
   height: 3.6rem;
   border-radius: 50%;
-  background: #262626;
-  color: #bbb;
+  background: #e7efff;
+  color: #1d4ed8;
   margin-bottom: 0.35rem;
 }
 
 .kv-drop.invalid .kv-drop-icon {
-  background: #33201f;
-  color: #f0a3a0;
+  background: #fdeeee;
+  color: #a1231f;
 }
 
 .kv-drop input[type="file"] {
@@ -329,7 +346,7 @@
 }
 
 .kv-field-error {
-  color: #f0938e;
+  color: #a1231f;
   font-size: 0.88rem;
   font-weight: 600;
   margin: 0.45rem 0 0;
@@ -341,9 +358,9 @@
   gap: 0.75rem;
   flex-wrap: wrap;
   margin-top: 0.75rem;
-  background: #1e1e1e;
-  border: 1px solid #3d3d3d;
-  border-radius: 4px;
+  background: #f7faff;
+  border: 1px solid #e3ecff;
+  border-radius: 10px;
   padding: 0.6rem 0.9rem;
 }
 
@@ -352,7 +369,7 @@
   word-break: break-all;
 }
 
-.kv-filebar .kv-icon { color: #bbb; }
+.kv-filebar .kv-icon { color: #1d4ed8; }
 
 .kv-text-tools {
   display: flex;
@@ -367,15 +384,15 @@
 .kv-status {
   margin-top: 1.25rem;
   padding: 0.9rem 1.1rem;
-  border-radius: 4px;
+  border-radius: 10px;
   font-size: 0.95rem;
   line-height: 1.5;
 }
 
-.kv-status.info { background: #22262e; color: #c7d2e8; }
-.kv-status.ok { background: #1d2b20; color: #a7d8b0; }
-.kv-status.error { background: #2e1f1f; color: #f0a3a0; }
-.kv-status.duplicate { background: #2e2818; color: #ecd28f; }
+.kv-status.info { background: #eef4ff; color: #1e3a8a; }
+.kv-status.ok { background: #e9f9ef; color: #0d6b32; }
+.kv-status.error { background: #fdeeee; color: #a1231f; }
+.kv-status.duplicate { background: #fff7e6; color: #7a4d00; }
 
 .kv-status .kv-icon {
   margin-right: 0.35rem;
@@ -387,22 +404,30 @@
 .kv-doc-list {
   display: flex;
   flex-direction: column;
-  margin-top: 0.5rem;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 .kv-doc {
   position: relative;
-  border-top: 1px solid #2e2e2e;
-  padding: 1.1rem 2.8rem 1.1rem 0.2rem;
-  background: transparent;
+  border: 1px solid #e3ecff;
+  border-radius: 14px;
+  padding: 1rem 3rem 1rem 1.15rem;
+  background: #fff;
   width: 100%;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
-.kv-doc:hover { background: #1b1b1b; }
+.kv-doc:hover {
+  border-color: #b9cbe8;
+  background: #fafcff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  transform: translateY(-1px);
+}
 
 .kv-doc.selected {
-  background: #1e1e1e;
-  box-shadow: inset 2px 0 0 #f2f2f2;
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 1px #1d4ed8, 0 8px 20px rgba(29, 78, 216, 0.12);
 }
 
 .kv-doc-main {
@@ -430,30 +455,27 @@
   justify-content: center;
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: 4px;
-  background: #242424;
-  color: #bbb;
+  border-radius: 10px;
   flex: none;
 }
 
-.kv-doc-icon.pdf { background: #242424; color: #d8d8d8; }
-.kv-doc-icon.text { background: #242424; color: #d8d8d8; }
+.kv-doc-icon.pdf { background: #e7efff; color: #1d4ed8; }
+.kv-doc-icon.text { background: #f1eafd; color: #6d28d9; }
 
 .kv-doc-icon.small {
   width: 2rem;
   height: 2rem;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .kv-doc-title {
-  font-weight: 650;
-  color: #f2f2f2;
+  font-weight: 700;
   margin-bottom: 0.25rem;
   word-break: break-word;
 }
 
 .kv-doc-summary {
-  color: #b5b5b5;
+  color: #53657b;
   font-size: 0.92rem;
   line-height: 1.5;
   margin: 0.35rem 0;
@@ -461,9 +483,9 @@
 
 .kv-kind-badge {
   display: inline-block;
-  background: #2a2a2a;
-  color: #aaa;
-  border-radius: 3px;
+  background: #eef2f7;
+  color: #44546a;
+  border-radius: 6px;
   padding: 0.15rem 0.5rem;
   font-size: 0.75rem;
   font-weight: 700;
@@ -474,25 +496,26 @@
 
 .kv-doc-delete {
   position: absolute;
-  top: 0.9rem;
-  right: 0.4rem;
+  top: 0.7rem;
+  right: 0.7rem;
   width: 2rem;
   height: 2rem;
-  border-radius: 4px;
+  border-radius: 8px;
   border: 1px solid transparent;
   background: transparent;
-  color: #777;
+  color: #93a1b8;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
 }
 
 .kv-doc-delete:hover {
-  background: #2e1f1f;
-  color: #f0a3a0;
-  border-color: #7a3a38;
+  background: #fdeeee;
+  color: #a1231f;
+  border-color: #f3c1bf;
 }
 
 .kv-doc-delete svg { width: 1rem; height: 1rem; }
@@ -504,31 +527,36 @@
   gap: 0.5rem;
   margin-top: 0.75rem;
   padding-top: 0.75rem;
-  border-top: 1px dashed #3a3a3a;
+  border-top: 1px dashed #e3ecff;
   font-size: 0.9rem;
-  color: #a8a8a8;
+  color: #53657b;
 }
 
 /* --- Chips ----------------------------------------------------------------- */
 
 .kv-chip {
   display: inline-block;
-  background: #2b2b2b;
-  color: #ccc;
-  border-radius: 4px;
+  background: #e7efff;
+  color: #1d4ed8;
+  border-radius: 999px;
   padding: 0.18rem 0.65rem;
   font-size: 0.78rem;
   font-weight: 600;
   margin: 0.15rem 0.25rem 0.15rem 0;
 }
 
-.kv-chip.clickable { cursor: pointer; border: 1px solid transparent; }
-.kv-chip.clickable:hover { border-color: #888; }
-.kv-chip.active { background: #f2f2f2; color: #111; }
+.kv-chip.clickable {
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.kv-chip.clickable:hover { border-color: #1d4ed8; }
+.kv-chip.active { background: #1d4ed8; color: #fff; }
 
 .kv-chip-count {
   display: inline-block;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(29, 78, 216, 0.14);
   border-radius: 999px;
   padding: 0 0.4rem;
   margin-left: 0.25rem;
@@ -536,22 +564,21 @@
   font-weight: 700;
 }
 
-.kv-chip.active .kv-chip-count { background: rgba(0, 0, 0, 0.18); }
+.kv-chip.active .kv-chip-count { background: rgba(255, 255, 255, 0.28); }
 
 /* --- Detail pane / excerpt --------------------------------------------------- */
 
 .kv-detail {
   margin-top: 1.25rem;
-  background: #202020;
-  border: 1px solid #333;
-  border-radius: 4px;
-  padding: 1.1rem 1.25rem;
+  border: 1px solid #e3ecff;
+  border-radius: 14px;
+  background: #f7faff;
+  padding: 1.25rem;
 }
 
 .kv-detail h3 {
   margin: 0 0 0.5rem;
   word-break: break-word;
-  color: #f5f5f5;
 }
 
 .kv-detail-grid {
@@ -562,8 +589,9 @@
 }
 
 .kv-detail-item {
-  background: #262626;
-  border-radius: 4px;
+  background: #fff;
+  border: 1px solid #e3ecff;
+  border-radius: 10px;
   padding: 0.7rem 0.9rem;
 }
 
@@ -571,13 +599,12 @@
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #999;
+  color: #6b7d94;
 }
 
 .kv-detail-item .v {
   font-weight: 700;
   margin-top: 0.15rem;
-  color: #f0f0f0;
 }
 
 .kv-excerpt { margin-top: 0.75rem; }
@@ -585,7 +612,7 @@
 .kv-excerpt-text {
   margin: 0.4rem 0 0;
   line-height: 1.55;
-  color: #d5d5d5;
+  color: #33475e;
   word-break: break-word;
 }
 
@@ -609,18 +636,18 @@
 
 .kv-score {
   font-weight: 800;
-  color: #a7d8b0;
+  color: #0d6b32;
   font-size: 0.9rem;
 }
 
 .kv-snippet {
-  background: #202020;
-  border-left: 3px solid #888;
+  background: #f7faff;
+  border-left: 3px solid #1d4ed8;
   padding: 0.7rem 0.9rem;
-  border-radius: 0 4px 4px 0;
+  border-radius: 0 8px 8px 0;
   margin: 0.6rem 0;
   line-height: 1.55;
-  color: #d5d5d5;
+  color: #33475e;
   font-size: 0.93rem;
 }
 
@@ -628,7 +655,7 @@
 
 .kv-empty {
   text-align: center;
-  color: #999;
+  color: #6b7d94;
   padding: 2.5rem 1rem;
   line-height: 1.6;
 }
@@ -640,8 +667,8 @@
   width: 4.2rem;
   height: 4.2rem;
   border-radius: 50%;
-  background: #222;
-  color: #bbb;
+  background: #eef4ff;
+  color: #1d4ed8;
   margin-bottom: 0.5rem;
 }
 
@@ -649,8 +676,8 @@
   display: inline-block;
   width: 1rem;
   height: 1rem;
-  border: 2px solid #3d3d3d;
-  border-top-color: #eee;
+  border: 2px solid #c9d6ea;
+  border-top-color: #1d4ed8;
   border-radius: 50%;
   animation: kv-spin 0.7s linear infinite;
   vertical-align: -2px;
@@ -666,19 +693,25 @@
   vertical-align: -0.18em;
 }
 
+.kv-status .kv-icon {
+  margin-right: 0.35rem;
+  vertical-align: -0.22em;
+}
+
 /* --- Small screens -------------------------------------------------------------- */
 
 @media (max-width: 640px) {
   .kv-body { flex-direction: column; }
   .kv-nav {
+    position: static;
     width: auto;
     flex-direction: row;
     flex-wrap: wrap;
-    border-right: none;
-    border-bottom: 1px solid #333;
+    padding: 1rem 1rem 0;
   }
-  .kv-tab { width: auto; flex: 1; }
-  .kv-main { padding: 1.25rem 1rem 3rem; }
+  .kv-tab { width: auto; flex: 1; justify-content: center; }
+  .kv-main { padding: 1rem; }
+  .kv-card { padding: 1.25rem; }
   .kv-search-row { flex-direction: column; }
   .kv-search-row .kv-btn { width: 100%; }
 }
