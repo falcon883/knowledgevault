@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { deleteDocument, listDocuments } from '../api.js';
+import {
+  IconAlertCircle,
+  IconCheckCircle,
+  IconClock,
+  IconFile,
+  IconFileText,
+  IconFilter,
+  IconFolder,
+  IconSearch,
+  IconTrash,
+} from '../icons.jsx';
 
 /**
  * KV-17 — Browse screen, wired to the live document list (GET /documents).
@@ -41,7 +52,7 @@ export default function BrowseScreen() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [rowConfirmId, setRowConfirmId] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState('');
   const [deleteError, setDeleteError] = useState('');
@@ -82,16 +93,16 @@ export default function BrowseScreen() {
 
   const selected = docs.find((d) => d.id === selectedId) || null;
 
-  async function handleDelete() {
-    if (!selected || deleting) return;
+  async function handleDelete(doc) {
+    if (!doc || deleting) return;
     setDeleting(true);
     setDeleteError('');
     try {
-      await deleteDocument(selected.id);
-      setDocs((prev) => prev.filter((d) => d.id !== selected.id));
-      setNotice(`Deleted "${selected.filename}".`);
-      setSelectedId(null);
-      setConfirmingDelete(false);
+      await deleteDocument(doc.id);
+      setDocs((prev) => prev.filter((d) => d.id !== doc.id));
+      if (selectedId === doc.id) setSelectedId(null);
+      setNotice(`Deleted "${doc.filename}".`);
+      setRowConfirmId(null);
     } catch (err) {
       setDeleteError(err.message || 'Could not delete the document.');
     } finally {
@@ -101,7 +112,7 @@ export default function BrowseScreen() {
 
   function selectDoc(id) {
     setSelectedId(selectedId === id ? null : id);
-    setConfirmingDelete(false);
+    setRowConfirmId(null);
     setDeleteError('');
     setNotice('');
   }
@@ -124,6 +135,7 @@ export default function BrowseScreen() {
 
       {state === 'error' && (
         <div className="kv-status error" role="alert">
+          <IconAlertCircle size={17} />
           <strong>Could not load documents.</strong> {error} Is the backend
           running?
         </div>
@@ -133,7 +145,7 @@ export default function BrowseScreen() {
         <>
           <div className="kv-row">
             <label className="kv-meta" htmlFor="kv-type-filter">
-              Filter
+              <IconFilter size={14} /> Filter
             </label>
             <select
               id="kv-type-filter"
@@ -170,39 +182,112 @@ export default function BrowseScreen() {
             <div className="kv-empty">
               {docs.length === 0 ? (
                 <>
+                  <span className="kv-empty-icon">
+                    <IconFolder size={34} />
+                  </span>
+                  <br />
                   No documents yet.
                   <br />
                   Head to the Capture tab to upload your first item.
                 </>
               ) : (
-                'No documents match the current filters.'
+                <>
+                  <span className="kv-empty-icon">
+                    <IconSearch size={34} />
+                  </span>
+                  <br />
+                  No documents match the current filters.
+                </>
               )}
             </div>
           ) : (
             <div className="kv-doc-list">
               {visible.map((d) => (
-                <button
+                <div
                   key={d.id}
-                  type="button"
                   className={`kv-doc${selectedId === d.id ? ' selected' : ''}`}
-                  onClick={() => selectDoc(d.id)}
-                  aria-expanded={selectedId === d.id}
                 >
-                  <span className="kv-kind-badge">{kindOf(d)}</span>
-                  <span className="kv-doc-title">{d.filename}</span>
-                  {d.summary && (
-                    <p className="kv-doc-summary">{d.summary}</p>
-                  )}
-                  <div>
-                    {parseTags(d).map((t) => (
-                      <span key={t} className="kv-chip">
-                        {t}
+                  <button
+                    type="button"
+                    className="kv-doc-main"
+                    onClick={() => selectDoc(d.id)}
+                    aria-expanded={selectedId === d.id}
+                  >
+                    <span
+                      className={`kv-doc-icon ${kindOf(d) === 'PDF' ? 'pdf' : 'text'}`}
+                    >
+                      {kindOf(d) === 'PDF' ? (
+                        <IconFile size={20} />
+                      ) : (
+                        <IconFileText size={20} />
+                      )}
+                    </span>
+                    <span className="kv-doc-body">
+                      <span className="kv-kind-badge">{kindOf(d)}</span>
+                      <span className="kv-doc-title">{d.filename}</span>
+                      {d.summary && (
+                        <p className="kv-doc-summary">{d.summary}</p>
+                      )}
+                      <div>
+                        {parseTags(d).map((t) => (
+                          <span key={t} className="kv-chip">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                      <span className="kv-meta">
+                        <IconClock size={13} /> {formatDate(d.uploaded_at)}
                       </span>
-                    ))}
-                  </div>
-                  <span className="kv-meta">{formatDate(d.uploaded_at)}</span>
-                </button>
+                    </span>
+                  </button>
+                  {rowConfirmId === d.id ? (
+                    <div className="kv-doc-confirm" role="alert">
+                      <span>Delete "{d.filename}"?</span>
+                      <button
+                        type="button"
+                        className="kv-btn kv-btn-danger kv-btn-small"
+                        disabled={deleting}
+                        onClick={() => handleDelete(d)}
+                      >
+                        {deleting ? 'Deleting…' : 'Yes, delete'}
+                      </button>
+                      <button
+                        type="button"
+                        className="kv-btn kv-btn-secondary kv-btn-small"
+                        disabled={deleting}
+                        onClick={() => setRowConfirmId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="kv-doc-delete"
+                      aria-label={`Delete ${d.filename}`}
+                      title={`Delete ${d.filename}`}
+                      onClick={() => {
+                        setRowConfirmId(d.id);
+                        setDeleteError('');
+                        setNotice('');
+                      }}
+                    >
+                      <IconTrash size={16} />
+                    </button>
+                  )}
+                </div>
               ))}
+            </div>
+          )}
+
+          {deleteError && (
+            <div
+              className="kv-status error"
+              role="alert"
+              style={{ marginTop: '1rem' }}
+            >
+              <IconAlertCircle size={17} />
+              <strong>Could not delete.</strong> {deleteError}
             </div>
           )}
 
@@ -238,58 +323,6 @@ export default function BrowseScreen() {
               )}
               {selected.summary && <p>{selected.summary}</p>}
               <span className="kv-meta">Source excerpt preview</span>
-
-              <div style={{ marginTop: '1rem' }}>
-                {!confirmingDelete ? (
-                  <button
-                    type="button"
-                    className="kv-btn kv-btn-danger"
-                    style={{ marginTop: 0 }}
-                    onClick={() => {
-                      setConfirmingDelete(true);
-                      setDeleteError('');
-                    }}
-                  >
-                    Delete document
-                  </button>
-                ) : (
-                  <div role="alert">
-                    <p className="kv-meta" style={{ marginBottom: '0.5rem' }}>
-                      Delete "{selected.filename}"? This removes it and its
-                      indexed content permanently.
-                    </p>
-                    <div className="kv-row">
-                      <button
-                        type="button"
-                        className="kv-btn kv-btn-danger"
-                        style={{ marginTop: 0 }}
-                        disabled={deleting}
-                        onClick={handleDelete}
-                      >
-                        {deleting ? 'Deleting…' : 'Yes, delete'}
-                      </button>
-                      <button
-                        type="button"
-                        className="kv-btn kv-btn-secondary"
-                        style={{ marginTop: 0 }}
-                        disabled={deleting}
-                        onClick={() => setConfirmingDelete(false)}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {deleteError && (
-                  <div
-                    className="kv-status error"
-                    role="alert"
-                    style={{ marginTop: '0.75rem' }}
-                  >
-                    <strong>Could not delete.</strong> {deleteError}
-                  </div>
-                )}
-              </div>
             </div>
           )}
 
@@ -299,6 +332,7 @@ export default function BrowseScreen() {
               role="status"
               style={{ marginTop: '1rem' }}
             >
+              <IconCheckCircle size={17} />
               {notice}
             </div>
           )}
