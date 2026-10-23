@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { deleteDocument, listDocuments } from '../api.js';
+import { deleteDocument, getDocument, listDocuments } from '../api.js';
 import {
   IconAlertCircle,
   IconCheckCircle,
@@ -17,6 +17,12 @@ import {
  *
  * Shows everything uploaded with a type filter, tag chips, newest-first
  * ordering, and a detail pane per document.
+ *
+ * KV-30 — Browse-view filters, completed: tag chips carry per-tag counts,
+ * the sort is a real control (newest / oldest / name), the detail pane
+ * loads the document's full record (GET /documents/{id}) and shows its
+ * real source excerpt, and the pane closes when a filter change hides
+ * the selected document.
  */
 
 function kindOf(doc) {
@@ -45,13 +51,36 @@ function formatDate(iso) {
   });
 }
 
+/**
+ * Pull the source excerpt out of a full document record. The detail
+ * endpoint's text field name has varied across backend iterations, so
+ * accept the known candidates and use the first non-empty string.
+ */
+function excerptOf(record) {
+  if (!record) return '';
+  const raw = [
+    record.excerpt,
+    record.text_preview,
+    record.preview,
+    record.snippet,
+    record.text,
+    record.content,
+  ].find((v) => typeof v === 'string' && v.trim());
+  if (!raw) return '';
+  const clean = raw.replace(/\s+/g, ' ').trim();
+  return clean.length > 600 ? `${clean.slice(0, 600).trimEnd()}…` : clean;
+}
+
 export default function BrowseScreen() {
   const [docs, setDocs] = useState([]);
   const [state, setState] = useState('loading'); // loading | ready | error
   const [error, setError] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState(null);
+  const [sortOrder, setSortOrder] = useState('newest');
   const [selectedId, setSelectedId] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [detailState, setDetailState] = useState('idle'); // idle | loading | ready | error
   const [rowConfirmId, setRowConfirmId] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState('');
@@ -81,17 +110,60 @@ export default function BrowseScreen() {
     return [...set].sort();
   }, [docs]);
 
-  const visible = useMemo(
-    () =>
-      docs.filter((d) => {
-        if (typeFilter !== 'all' && kindOf(d) !== typeFilter) return false;
-        if (tagFilter && !parseTags(d).includes(tagFilter)) return false;
-        return true;
-      }),
-    [docs, typeFilter, tagFilter],
-  );
+  const tagCounts = useMemo(() => {
+    const counts = new Map();
+    docs.forEach((d) =>
+      parseTags(d).forEach((t) => counts.set(t, (counts.get(t) || 0) + 1)),
+    );
+    return counts;
+  }, [docs]);
 
-  const selected = docs.find((d) => d.id === selectedId) || null;
+  const visible = useMemo(() => {
+    const filtered = docs.filter((d) => {
+      if (typeFilter !== 'all' && kindOf(d) !== typeFilter) return false;
+      if (tagFilter && !parseTags(d).includes(tagFilter)) return false;
+      return true;
+    });
+    return filtered.sort((a, b) => {
+      if (sortOrder === 'name') {
+        return (a.filename || '').localeCompare(b.filename || '');
+      }
+      const ta = a.uploaded_at ? Date.parse(a.uploaded_at) : 0;
+      const tb = b.uploaded_at ? Date.parse(b.uploaded_at) : 0;
+      return sortOrder === 'oldest' ? ta - tb : tb - ta;
+    });
+  }, [docs, typeFilter, tagFilter, sortOrder]);
+
+  // Derived from the *visible* list on purpose: when a filter change
+  // hides the selected document, the detail pane closes with it.
+  const selected = visible.find((d) => d.id === selectedId) || null;
+  const selectedKey = selected ? selected.id : null;
+
+  useEffect(() => {
+    if (selectedKey == null) {
+      setDetail(null);
+      setDetailState('idle');
+      return;
+    }
+    let cancelled = false;
+    setDetail(null);
+    setDetailState('loading');
+    getDocument(selectedKey)
+      .then((data) => {
+        if (cancelled) return;
+        setDetail(data && typeof data === 'object' ? data : null);
+        setDetailState('ready');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDetailState('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedKey]);
+
+  const excerpt = useMemo(() => excerptOf(detail), [detail]);
 
   async function handleDelete(doc) {
     if (!doc || deleting) return;
@@ -159,7 +231,21 @@ export default function BrowseScreen() {
               <option value="PDF">PDF</option>
               <option value="Text">Text</option>
             </select>
-            <span className="kv-meta">Newest first</span>
+            <label className="kv-meta" htmlFor="kv-sort">
+              Sort
+            </label>
+            <select
+              id="kv-sort"
+              className="kv-select"
+              style={{ width: 'auto' }}
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              aria-label="Sort documents"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="name">Name (A–Z)</option>
+            </select>
           </div>
 
           {allTags.length > 0 && (
@@ -172,7 +258,7 @@ export default function BrowseScreen() {
                   aria-pressed={tagFilter === t}
                   onClick={() => setTagFilter(tagFilter === t ? null : t)}
                 >
-                  {t}
+                  {t} <span className="kv-chip-count">{tagCounts.get(t)}</span>
                 </button>
               ))}
             </div>
@@ -322,7 +408,27 @@ export default function BrowseScreen() {
                 </div>
               )}
               {selected.summary && <p>{selected.summary}</p>}
-              <span className="kv-meta">Source excerpt preview</span>
+              <div className="kv-excerpt">
+                <span className="kv-meta">Source excerpt</span>
+                {detailState === 'loading' && (
+                  <p className="kv-meta" aria-live="polite">
+                    Loading excerpt…
+                  </p>
+                )}
+                {detailState === 'error' && (
+                  <p className="kv-meta">
+                    Could not load the excerpt for this document.
+                  </p>
+                )}
+                {detailState === 'ready' &&
+                  (excerpt ? (
+                    <p className="kv-excerpt-text">{excerpt}</p>
+                  ) : (
+                    <p className="kv-meta">
+                      No excerpt available for this document yet.
+                    </p>
+                  ))}
+              </div>
             </div>
           )}
 
