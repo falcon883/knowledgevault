@@ -3,22 +3,24 @@ import { checkHealth } from './api.js';
 import UploadScreen from './screens/UploadScreen.jsx';
 import BrowseScreen from './screens/BrowseScreen.jsx';
 import SearchScreen from './screens/SearchScreen.jsx';
-import { IconBookOpen, IconFolder, IconSearch, IconUploadCloud } from './icons.jsx';
 import './app.css';
 
 /**
  * KnowledgeVault app shell.
  *
- * Tab navigation across the three Sprint 2 frontend screens:
+ * Layout follows the team's wireframes: a slim top bar (brand left,
+ * archive label and backend status right) over a left sidebar nav with
+ * the three screens stacked as full-width buttons, active one filled.
+ *
  *  - KV-19 Capture (upload wired to POST /upload)
  *  - KV-17 Browse (document list wired to GET /documents)
  *  - KV-18 Search (semantic search wired to POST /search)
  */
 
 const TABS = [
-  { id: 'search', label: 'Search', Screen: SearchScreen, Icon: IconSearch },
-  { id: 'browse', label: 'Browse', Screen: BrowseScreen, Icon: IconFolder },
-  { id: 'capture', label: 'Capture', Screen: UploadScreen, Icon: IconUploadCloud },
+  { id: 'capture', label: 'Capture', Screen: UploadScreen },
+  { id: 'browse', label: 'Browse', Screen: BrowseScreen },
+  { id: 'search', label: 'Search', Screen: SearchScreen },
 ];
 
 function App() {
@@ -41,45 +43,42 @@ function App() {
   return (
     <div className="kv-shell">
       <header className="kv-topbar">
-        <div className="kv-brand">
-          <span className="kv-brand-mark">
-            <IconBookOpen size={20} />
+        <div className="kv-brand">KnowledgeVault</div>
+        <div className="kv-top-right">
+          <span className="kv-archive">Personal archive</span>
+          <span
+            className={`kv-status-dot${backendOk == null ? '' : backendOk ? ' ok' : ' down'}`}
+            title="Backend API status"
+          >
+            <i aria-hidden="true" />
+            {backendOk == null
+              ? 'checking backend…'
+              : backendOk
+                ? 'backend connected'
+                : 'backend not running'}
           </span>
-          KnowledgeVault
         </div>
-        <nav className="kv-nav" aria-label="Primary">
-          {TABS.map((t) => {
-            const TabIcon = t.Icon;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                className="kv-tab"
-                aria-pressed={tab === t.id}
-                onClick={() => setTab(t.id)}
-              >
-                <TabIcon size={16} />
-                {t.label}
-              </button>
-            );
-          })}
-        </nav>
-        <span
-          className={`kv-status-dot${backendOk == null ? '' : backendOk ? ' ok' : ' down'}`}
-          title="Backend API status"
-        >
-          <i aria-hidden="true" />
-          {backendOk == null
-            ? 'checking backend…'
-            : backendOk
-              ? 'backend connected'
-              : 'backend not running'}
-        </span>
       </header>
 
-      <main className="kv-main">
-        <ActiveScreen key={tab} onNavigate={setTab} />
-      </main>
+      <div className="kv-body">
+        <nav className="kv-nav" aria-label="Primary">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className="kv-tab"
+              aria-pressed={tab === t.id}
+              onClick={() => setTab(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
+
+        <main className="kv-main">
+          <ActiveScreen key={tab} onNavigate={setTab} />
+        </main>
+      </div>
     </div>
   );
 }

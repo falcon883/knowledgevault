@@ -1,27 +1,32 @@
-/* KnowledgeVault app styles — screens for KV-17 (Browse), KV-18 (Search), KV-19 (Capture). */
+/* KnowledgeVault app styles — dark wireframe theme.
+   Layout and look follow the team's wireframes: near-black background,
+   hairline borders, left sidebar nav, flat list rows (no cards).
+   Screens: KV-19 Capture, KV-17/KV-30 Browse, KV-18 Search. */
 
 .kv-shell {
   min-height: 100vh;
-  background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
-  color: #122033;
+  background: #161616;
+  color: #ececec;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
+/* --- Top bar ------------------------------------------------------------ */
+
 .kv-topbar {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 1.1rem 1.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid #333;
 }
 
 .kv-brand {
-  font-size: 1.25rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #f5f5f5;
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -31,40 +36,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.1rem;
-  height: 2.1rem;
-  border-radius: 9px;
-  background: #1d4ed8;
-  color: #fff;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #1e1e1e;
+  color: #ddd;
 }
 
-.kv-nav {
+.kv-top-right {
   display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.kv-tab {
-  border: 1px solid transparent;
-  background: transparent;
-  color: #44546a;
-  padding: 0.55rem 1rem;
-  border-radius: 10px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 1.1rem;
 }
 
-.kv-tab:hover {
-  background: #e7efff;
-}
-
-.kv-tab[aria-pressed="true"] {
-  background: #1d4ed8;
-  color: #fff;
+.kv-archive {
+  font-size: 0.85rem;
+  color: #9a9a9a;
 }
 
 .kv-status-dot {
@@ -72,43 +60,89 @@
   align-items: center;
   gap: 0.45rem;
   font-size: 0.8rem;
-  color: #5b6d84;
+  color: #9a9a9a;
 }
 
 .kv-status-dot i {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #9aa7b8;
+  background: #777;
   display: inline-block;
 }
 
-.kv-status-dot.ok i { background: #00a240; }
-.kv-status-dot.down i { background: #e02e2a; }
+.kv-status-dot.ok i { background: #4caf6d; }
+.kv-status-dot.down i { background: #d9534f; }
 
-.kv-main {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 1rem 1.5rem 4rem;
+/* --- Sidebar + content --------------------------------------------------- */
+
+.kv-body {
+  display: flex;
+  align-items: stretch;
 }
 
+.kv-nav {
+  flex: none;
+  width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.1rem 0.9rem;
+  border-right: 1px solid #333;
+}
+
+.kv-tab {
+  display: block;
+  width: 100%;
+  border: 1px solid #4a4a4a;
+  background: transparent;
+  color: #ddd;
+  padding: 0.6rem 1rem;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+}
+
+.kv-tab:hover {
+  background: #1f1f1f;
+  border-color: #6d6d6d;
+}
+
+.kv-tab[aria-pressed="true"] {
+  background: #f2f2f2;
+  border-color: #f2f2f2;
+  color: #111;
+  font-weight: 600;
+}
+
+.kv-main {
+  flex: 1;
+  min-width: 0;
+  max-width: 1020px;
+  padding: 1.75rem 2rem 4rem;
+}
+
+/* --- Screen scaffolding -------------------------------------------------- */
+
 .kv-card {
-  background: #fff;
-  border: 1px solid #e3ecff;
-  border-radius: 18px;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
-  padding: 1.75rem;
+  background: transparent;
+  border: none;
+  padding: 0;
   margin-bottom: 1.25rem;
 }
 
 .kv-card h2 {
   margin: 0 0 0.4rem;
-  font-size: 1.5rem;
-  letter-spacing: -0.02em;
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: #f5f5f5;
 }
 
 .kv-lede {
-  color: #53657b;
+  color: #a8a8a8;
   margin: 0 0 1.25rem;
   line-height: 1.55;
 }
@@ -117,20 +151,34 @@
   display: block;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #3c4f66;
+  color: #cfcfcf;
   margin: 1rem 0 0.4rem;
 }
+
+.kv-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.kv-meta {
+  font-size: 0.85rem;
+  color: #999;
+}
+
+/* --- Forms --------------------------------------------------------------- */
 
 .kv-input,
 .kv-textarea,
 .kv-select {
   width: 100%;
-  border: 1px solid #c9d6ea;
-  border-radius: 10px;
-  padding: 0.7rem 0.9rem;
+  border: 1px solid #454545;
+  border-radius: 4px;
+  padding: 0.65rem 0.8rem;
   font: inherit;
-  background: #fff;
-  color: inherit;
+  background: #1e1e1e;
+  color: #eee;
 }
 
 .kv-textarea {
@@ -139,22 +187,27 @@
   line-height: 1.5;
 }
 
+.kv-input::placeholder,
+.kv-textarea::placeholder {
+  color: #777;
+}
+
 .kv-input:focus-visible,
 .kv-textarea:focus-visible,
 .kv-select:focus-visible,
 .kv-tab:focus-visible,
 .kv-btn:focus-visible {
-  outline: 2px solid #1d4ed8;
+  outline: 2px solid #d6d6d6;
   outline-offset: 2px;
 }
 
 .kv-btn {
-  border: none;
-  border-radius: 12px;
-  background: #1d4ed8;
-  color: #fff;
-  padding: 0.8rem 1.4rem;
-  font-size: 1rem;
+  border: 1px solid #f2f2f2;
+  border-radius: 4px;
+  background: #f2f2f2;
+  color: #111;
+  padding: 0.65rem 1.3rem;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
   margin-top: 1.25rem;
@@ -164,34 +217,45 @@
   gap: 0.45rem;
 }
 
-.kv-btn:hover { background: #1a45bd; }
+.kv-btn:hover { background: #fff; }
 
 .kv-btn:disabled {
-  background: #9db4e8;
+  background: #3a3a3a;
+  border-color: #3a3a3a;
+  color: #888;
   cursor: not-allowed;
 }
 
 .kv-btn-secondary {
-  background: #eef3fd;
-  color: #183153;
-  border: 1px solid #cfe0ff;
+  background: transparent;
+  color: #ddd;
+  border: 1px solid #555;
 }
 
-.kv-btn-secondary:hover { background: #e2ebfd; }
+.kv-btn-secondary:hover { background: #1f1f1f; border-color: #888; }
 
 .kv-btn-danger {
-  background: #fdeeee;
-  color: #a1231f;
-  border: 1px solid #f3c1bf;
+  background: transparent;
+  color: #f0a3a0;
+  border: 1px solid #7a3a38;
 }
 
-.kv-btn-danger:hover { background: #f9dcdc; }
+.kv-btn-danger:hover { background: #2a1a1a; }
 
 .kv-btn-danger:disabled {
-  background: #f6e3e2;
-  color: #c07a78;
+  background: transparent;
+  color: #8a605e;
+  border-color: #4a3230;
   cursor: not-allowed;
 }
+
+.kv-btn-small {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  margin-top: 0;
+}
+
+/* --- Capture ------------------------------------------------------------- */
 
 .kv-kind-toggle {
   display: flex;
@@ -200,47 +264,72 @@
 }
 
 .kv-kind-btn {
-  border: 1px solid #c9d6ea;
-  background: #fff;
-  border-radius: 10px;
+  border: 1px solid #4a4a4a;
+  background: transparent;
+  border-radius: 4px;
   padding: 0.55rem 1.1rem;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 0.92rem;
   cursor: pointer;
-  color: #3c4f66;
+  color: #ddd;
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
 }
 
+.kv-kind-btn:hover { border-color: #6d6d6d; background: #1f1f1f; }
+
 .kv-kind-btn[aria-pressed="true"] {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
-  color: #fff;
+  background: #f2f2f2;
+  border-color: #f2f2f2;
+  color: #111;
+  font-weight: 600;
 }
 
 .kv-drop {
-  border: 2px dashed #b9cbe8;
-  border-radius: 12px;
+  border: 2px dashed #555;
+  border-radius: 4px;
   padding: 1.75rem 1rem;
   text-align: center;
-  color: #53657b;
+  color: #a8a8a8;
   margin-top: 0.4rem;
   cursor: pointer;
+  background: #1b1b1b;
 }
 
 .kv-drop.dragging {
-  border-color: #1d4ed8;
-  background: #f0f5ff;
+  border-color: #ddd;
+  background: #222;
 }
 
 .kv-drop.invalid {
-  border-color: #e02e2a;
-  background: #fff6f6;
+  border-color: #b0524f;
+  background: #241818;
+}
+
+.kv-drop-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 50%;
+  background: #262626;
+  color: #bbb;
+  margin-bottom: 0.35rem;
+}
+
+.kv-drop.invalid .kv-drop-icon {
+  background: #33201f;
+  color: #f0a3a0;
+}
+
+.kv-drop input[type="file"] {
+  margin-top: 0.75rem;
 }
 
 .kv-field-error {
-  color: #a1231f;
+  color: #f0938e;
   font-size: 0.88rem;
   font-weight: 600;
   margin: 0.45rem 0 0;
@@ -252,9 +341,9 @@
   gap: 0.75rem;
   flex-wrap: wrap;
   margin-top: 0.75rem;
-  background: #f7faff;
-  border: 1px solid #e3ecff;
-  border-radius: 10px;
+  background: #1e1e1e;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
   padding: 0.6rem 0.9rem;
 }
 
@@ -262,6 +351,8 @@
   font-weight: 600;
   word-break: break-all;
 }
+
+.kv-filebar .kv-icon { color: #bbb; }
 
 .kv-text-tools {
   display: flex;
@@ -271,56 +362,47 @@
   margin-top: 0.6rem;
 }
 
-.kv-drop input[type="file"] {
-  margin-top: 0.75rem;
-}
+/* --- Status banners -------------------------------------------------------- */
 
 .kv-status {
   margin-top: 1.25rem;
   padding: 0.9rem 1.1rem;
-  border-radius: 10px;
+  border-radius: 4px;
   font-size: 0.95rem;
   line-height: 1.5;
 }
 
-.kv-status.info { background: #eef4ff; color: #1e3a8a; }
-.kv-status.ok { background: #e9f9ef; color: #0d6b32; }
-.kv-status.error { background: #fdeeee; color: #a1231f; }
-.kv-status.duplicate { background: #fff7e6; color: #7a4d00; }
+.kv-status.info { background: #22262e; color: #c7d2e8; }
+.kv-status.ok { background: #1d2b20; color: #a7d8b0; }
+.kv-status.error { background: #2e1f1f; color: #f0a3a0; }
+.kv-status.duplicate { background: #2e2818; color: #ecd28f; }
 
-.kv-meta {
-  font-size: 0.85rem;
-  color: #6b7d94;
+.kv-status .kv-icon {
+  margin-right: 0.35rem;
+  vertical-align: -0.22em;
 }
 
-.kv-row {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  flex-wrap: wrap;
-}
+/* --- Browse ---------------------------------------------------------------- */
 
 .kv-doc-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  margin-top: 1rem;
+  margin-top: 0.5rem;
 }
 
 .kv-doc {
   position: relative;
-  border: 1px solid #e3ecff;
-  border-radius: 12px;
-  padding: 1rem 3rem 1rem 1.15rem;
-  background: #fff;
+  border-top: 1px solid #2e2e2e;
+  padding: 1.1rem 2.8rem 1.1rem 0.2rem;
+  background: transparent;
   width: 100%;
 }
 
-.kv-doc:hover { border-color: #b9cbe8; background: #fafcff; }
+.kv-doc:hover { background: #1b1b1b; }
 
 .kv-doc.selected {
-  border-color: #1d4ed8;
-  box-shadow: 0 0 0 1px #1d4ed8;
+  background: #1e1e1e;
+  box-shadow: inset 2px 0 0 #f2f2f2;
 }
 
 .kv-doc-main {
@@ -342,16 +424,64 @@
   min-width: 0;
 }
 
-.kv-doc-delete {
-  position: absolute;
-  top: 0.7rem;
-  right: 0.7rem;
+.kv-doc-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 4px;
+  background: #242424;
+  color: #bbb;
+  flex: none;
+}
+
+.kv-doc-icon.pdf { background: #242424; color: #d8d8d8; }
+.kv-doc-icon.text { background: #242424; color: #d8d8d8; }
+
+.kv-doc-icon.small {
   width: 2rem;
   height: 2rem;
-  border-radius: 8px;
+  border-radius: 4px;
+}
+
+.kv-doc-title {
+  font-weight: 650;
+  color: #f2f2f2;
+  margin-bottom: 0.25rem;
+  word-break: break-word;
+}
+
+.kv-doc-summary {
+  color: #b5b5b5;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin: 0.35rem 0;
+}
+
+.kv-kind-badge {
+  display: inline-block;
+  background: #2a2a2a;
+  color: #aaa;
+  border-radius: 3px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-right: 0.5rem;
+}
+
+.kv-doc-delete {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.4rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 4px;
   border: 1px solid transparent;
   background: transparent;
-  color: #93a1b8;
+  color: #777;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -360,9 +490,9 @@
 }
 
 .kv-doc-delete:hover {
-  background: #fdeeee;
-  color: #a1231f;
-  border-color: #f3c1bf;
+  background: #2e1f1f;
+  color: #f0a3a0;
+  border-color: #7a3a38;
 }
 
 .kv-doc-delete svg { width: 1rem; height: 1rem; }
@@ -374,35 +504,18 @@
   gap: 0.5rem;
   margin-top: 0.75rem;
   padding-top: 0.75rem;
-  border-top: 1px dashed #e3ecff;
+  border-top: 1px dashed #3a3a3a;
   font-size: 0.9rem;
-  color: #53657b;
+  color: #a8a8a8;
 }
 
-.kv-btn-small {
-  padding: 0.45rem 0.9rem;
-  font-size: 0.85rem;
-  margin-top: 0;
-}
-
-.kv-doc-title {
-  font-weight: 700;
-  margin-bottom: 0.25rem;
-  word-break: break-word;
-}
-
-.kv-doc-summary {
-  color: #53657b;
-  font-size: 0.92rem;
-  line-height: 1.5;
-  margin: 0.35rem 0;
-}
+/* --- Chips ----------------------------------------------------------------- */
 
 .kv-chip {
   display: inline-block;
-  background: #e7efff;
-  color: #1d4ed8;
-  border-radius: 999px;
+  background: #2b2b2b;
+  color: #ccc;
+  border-radius: 4px;
   padding: 0.18rem 0.65rem;
   font-size: 0.78rem;
   font-weight: 600;
@@ -410,12 +523,12 @@
 }
 
 .kv-chip.clickable { cursor: pointer; border: 1px solid transparent; }
-.kv-chip.clickable:hover { border-color: #1d4ed8; }
-.kv-chip.active { background: #1d4ed8; color: #fff; }
+.kv-chip.clickable:hover { border-color: #888; }
+.kv-chip.active { background: #f2f2f2; color: #111; }
 
 .kv-chip-count {
   display: inline-block;
-  background: rgba(29, 78, 216, 0.14);
+  background: rgba(255, 255, 255, 0.14);
   border-radius: 999px;
   padding: 0 0.4rem;
   margin-left: 0.25rem;
@@ -423,39 +536,22 @@
   font-weight: 700;
 }
 
-.kv-chip.active .kv-chip-count { background: rgba(255, 255, 255, 0.28); }
+.kv-chip.active .kv-chip-count { background: rgba(0, 0, 0, 0.18); }
 
-.kv-excerpt { margin-top: 0.75rem; }
-
-.kv-excerpt-text {
-  margin: 0.4rem 0 0;
-  line-height: 1.55;
-  color: #33475e;
-  word-break: break-word;
-}
-
-.kv-kind-badge {
-  display: inline-block;
-  background: #eef2f7;
-  color: #44546a;
-  border-radius: 6px;
-  padding: 0.15rem 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-right: 0.5rem;
-}
+/* --- Detail pane / excerpt --------------------------------------------------- */
 
 .kv-detail {
   margin-top: 1.25rem;
-  border-top: 1px solid #e3ecff;
-  padding-top: 1.25rem;
+  background: #202020;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 1.1rem 1.25rem;
 }
 
 .kv-detail h3 {
   margin: 0 0 0.5rem;
   word-break: break-word;
+  color: #f5f5f5;
 }
 
 .kv-detail-grid {
@@ -466,8 +562,8 @@
 }
 
 .kv-detail-item {
-  background: #f7faff;
-  border-radius: 10px;
+  background: #262626;
+  border-radius: 4px;
   padding: 0.7rem 0.9rem;
 }
 
@@ -475,13 +571,25 @@
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #6b7d94;
+  color: #999;
 }
 
 .kv-detail-item .v {
   font-weight: 700;
   margin-top: 0.15rem;
+  color: #f0f0f0;
 }
+
+.kv-excerpt { margin-top: 0.75rem; }
+
+.kv-excerpt-text {
+  margin: 0.4rem 0 0;
+  line-height: 1.55;
+  color: #d5d5d5;
+  word-break: break-word;
+}
+
+/* --- Search ------------------------------------------------------------------ */
 
 .kv-search-row {
   display: flex;
@@ -491,97 +599,38 @@
 .kv-search-row .kv-input { flex: 1; }
 .kv-search-row .kv-btn { margin-top: 0; white-space: nowrap; }
 
-.kv-score {
-  font-weight: 800;
-  color: #0d6b32;
-  font-size: 0.9rem;
-}
-
-.kv-snippet {
-  background: #f7faff;
-  border-left: 3px solid #1d4ed8;
-  padding: 0.7rem 0.9rem;
-  border-radius: 0 8px 8px 0;
-  margin: 0.6rem 0;
-  line-height: 1.55;
-  color: #33475e;
-  font-size: 0.93rem;
-}
-
-.kv-empty {
-  text-align: center;
-  color: #6b7d94;
-  padding: 2.5rem 1rem;
-  line-height: 1.6;
-}
-
-.kv-spinner {
-  display: inline-block;
-  width: 1rem;
-  height: 1rem;
-  border: 2px solid #c9d6ea;
-  border-top-color: #1d4ed8;
-  border-radius: 50%;
-  animation: kv-spin 0.7s linear infinite;
-  vertical-align: -2px;
-  margin-right: 0.5rem;
-}
-
-@keyframes kv-spin { to { transform: rotate(360deg); } }
-
-/* Icon system (src/icons.jsx) */
-.kv-icon {
-  flex: none;
-  vertical-align: -0.18em;
-}
-
-.kv-status .kv-icon {
-  margin-right: 0.35rem;
-  vertical-align: -0.22em;
-}
-
-.kv-drop-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 3.6rem;
-  height: 3.6rem;
-  border-radius: 50%;
-  background: #e7efff;
-  color: #1d4ed8;
-  margin-bottom: 0.35rem;
-}
-
-.kv-drop.invalid .kv-drop-icon {
-  background: #fdeeee;
-  color: #a1231f;
-}
-
-.kv-doc-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 10px;
-  flex: none;
-}
-
-.kv-doc-icon.pdf { background: #e7efff; color: #1d4ed8; }
-.kv-doc-icon.text { background: #f1eafd; color: #6d28d9; }
-
-.kv-doc-icon.small {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 8px;
-}
-
 .kv-result-head {
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
   min-width: 0;
   text-align: left;
+}
+
+.kv-score {
+  font-weight: 800;
+  color: #a7d8b0;
+  font-size: 0.9rem;
+}
+
+.kv-snippet {
+  background: #202020;
+  border-left: 3px solid #888;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0 4px 4px 0;
+  margin: 0.6rem 0;
+  line-height: 1.55;
+  color: #d5d5d5;
+  font-size: 0.93rem;
+}
+
+/* --- Empty / loading --------------------------------------------------------- */
+
+.kv-empty {
+  text-align: center;
+  color: #999;
+  padding: 2.5rem 1rem;
+  line-height: 1.6;
 }
 
 .kv-empty-icon {
@@ -591,15 +640,45 @@
   width: 4.2rem;
   height: 4.2rem;
   border-radius: 50%;
-  background: #eef4ff;
-  color: #1d4ed8;
+  background: #222;
+  color: #bbb;
   margin-bottom: 0.5rem;
 }
 
-.kv-filebar .kv-icon { color: #1d4ed8; }
+.kv-spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #3d3d3d;
+  border-top-color: #eee;
+  border-radius: 50%;
+  animation: kv-spin 0.7s linear infinite;
+  vertical-align: -2px;
+  margin-right: 0.5rem;
+}
+
+@keyframes kv-spin { to { transform: rotate(360deg); } }
+
+/* --- Icon system (src/icons.jsx) ---------------------------------------------- */
+
+.kv-icon {
+  flex: none;
+  vertical-align: -0.18em;
+}
+
+/* --- Small screens -------------------------------------------------------------- */
 
 @media (max-width: 640px) {
-  .kv-card { padding: 1.25rem; }
+  .kv-body { flex-direction: column; }
+  .kv-nav {
+    width: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    border-bottom: 1px solid #333;
+  }
+  .kv-tab { width: auto; flex: 1; }
+  .kv-main { padding: 1.25rem 1rem 3rem; }
   .kv-search-row { flex-direction: column; }
   .kv-search-row .kv-btn { width: 100%; }
 }
