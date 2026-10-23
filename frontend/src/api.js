@@ -10,8 +10,19 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 async function handleResponse(res, action) {
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `${action} failed (HTTP ${res.status})`);
+    const body = await res.json().catch(() => ({}));
+    const detail = body?.detail;
+    const err = new Error(
+      typeof detail === 'string'
+        ? detail
+        : `${action} failed (HTTP ${res.status})`,
+    );
+    // KV-29: carry the HTTP status and the raw detail (a string, or an
+    // object such as the KV-25 duplicate payload with id/filename) so
+    // screens can show a specific, readable message per failure case.
+    err.status = res.status;
+    err.detail = detail;
+    throw err;
   }
   return res.json();
 }
