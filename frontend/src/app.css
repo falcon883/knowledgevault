@@ -661,10 +661,40 @@
   text-align: left;
 }
 
-.kv-score {
-  font-weight: 800;
-  color: #0d6b32;
-  font-size: 0.9rem;
+.kv-relevance {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.kv-relevance-bar {
+  display: inline-block;
+  width: 64px;
+  height: 6px;
+  border-radius: 999px;
+  background: #e3ecff;
+  overflow: hidden;
+}
+
+.kv-relevance-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+.kv-relevance-label {
+  font-weight: 700;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* KV-31: screens stay mounted while hidden so tab state survives. */
+.kv-screen[hidden] {
+  display: none;
 }
 
 .kv-snippet {
