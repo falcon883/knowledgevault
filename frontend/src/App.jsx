@@ -16,6 +16,11 @@ import './app.css';
  *  - KV-19 Capture (upload wired to POST /upload)
  *  - KV-17 Browse (document list wired to GET /documents)
  *  - KV-18 Search (semantic search wired to POST /search)
+ *
+ * KV-31 — the screens stay mounted while hidden (no more remount on tab
+ * switch), so a search query and its results survive a trip to another
+ * tab. Browse still refreshes its list whenever it is navigated to from
+ * the upload flow, via the browseRefresh signal.
  */
 
 const TABS = [
@@ -27,6 +32,9 @@ const TABS = [
 function App() {
   const [tab, setTab] = useState('search');
   const [backendOk, setBackendOk] = useState(null);
+  // Bumped every time Browse is navigated to from the upload flow, so its
+  // list refreshes even though the screen no longer remounts on tab switch.
+  const [browseRefresh, setBrowseRefresh] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,8 +46,10 @@ function App() {
     };
   }, [tab]);
 
-  const active = TABS.find((t) => t.id === tab) ?? TABS[0];
-  const ActiveScreen = active.Screen;
+  function navigate(next) {
+    if (next === 'browse') setBrowseRefresh((n) => n + 1);
+    setTab(next);
+  }
 
   return (
     <div className="kv-shell">
@@ -86,7 +96,23 @@ function App() {
         </nav>
 
         <main className="kv-main">
-          <ActiveScreen key={tab} onNavigate={setTab} />
+          {TABS.map((t) => {
+            const Screen = t.Screen;
+            const isActive = tab === t.id;
+            return (
+              <div
+                key={t.id}
+                className="kv-screen"
+                hidden={!isActive}
+                aria-hidden={!isActive}
+              >
+                <Screen
+                  onNavigate={navigate}
+                  refreshSignal={t.id === 'browse' ? browseRefresh : undefined}
+                />
+              </div>
+            );
+          })}
         </main>
       </div>
     </div>
