@@ -1,5 +1,6 @@
 """KV-13/14/15: chunk -> embed -> store in pgvector -> find by similarity."""
 
+import pytest
 from sqlalchemy import select
 
 from chunking import chunk_text
@@ -25,7 +26,9 @@ def test_embedding_in_batches_matches_embedding_one_by_one():
     batched = embed_texts(texts)
     assert len(batched) == len(texts)
     for text, vector in zip(texts[:3], batched[:3]):
-        assert embed_text(text) == vector
+        # The same text in a different batch can differ in the last few decimal
+        # places (padding and CPU math), so compare with a small tolerance.
+        assert embed_text(text) == pytest.approx(vector, abs=1e-5)
 
 
 def test_chunk_embed_store_and_search(db):
