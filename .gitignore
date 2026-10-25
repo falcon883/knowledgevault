@@ -1,0 +1,19 @@
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Secrets and local settings (keep .env.example, which is safe to share)
+.env
+
+# Node
+node_modules/
+dist/

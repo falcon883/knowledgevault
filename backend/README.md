@@ -1,5 +1,9 @@
 # KnowledgeVault Backend
 
+FastAPI service for KnowledgeVault: ingestion, semantic search, tags and
+summaries, and the browse API used by the React frontend (see the
+[root README](../README.md) for the whole project).
+
 ## Sprint 3: upload validation, duplicate detection, browse and preview API
 
 - **KV-24**: every bad upload is rejected with a clear message before
@@ -31,8 +35,8 @@ Builds on Sprint 1 (KV-5/6/7). This sprint:
   (`enrichment.py`), stored on the document and returned by `/upload`,
   `/documents`, and `/search`.
 
-Not yet wired in (separate Sprint 2 tickets): the frontend screens
-(KV-17/18/19).
+The React frontend (`../frontend`) uses these endpoints for its Capture
+(upload), Browse and Search screens.
 
 ## Why pgvector + local embeddings
 
@@ -76,12 +80,12 @@ no need to do it by hand.)
 
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate       # Windows: venv\Scripts\activate
+python -m venv .venv
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Copy `env.example` to `.env` (or just export the variable) if your
+Copy `.env.example` to `.env` (or just export the variable) if your
 Postgres isn't on `localhost:5432` with the default credentials above:
 
 ```bash
