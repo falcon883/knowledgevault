@@ -1,5 +1,7 @@
 # KnowledgeVault
 
+[![CI](https://github.com/falcon883/knowledgevault/actions/workflows/ci.yml/badge.svg)](https://github.com/falcon883/knowledgevault/actions/workflows/ci.yml)
+
 A personal knowledge management web application that lets users retrieve
 their own notes, PDFs, and articles by meaning rather than by exact
 keyword. Built as the MSCS 3999 capstone project at Clark University,

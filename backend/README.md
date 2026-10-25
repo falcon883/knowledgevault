@@ -107,16 +107,37 @@ run also downloads it, about 90 MB), so it is ready before the first request.
 The log line `Embedding model loaded in X.Xs` shows when it is. `GET /health`
 reports `"model_loaded": true` once it is.
 
-## Verify the pipeline works
+## Running the tests
 
 ```bash
-python test_pipeline.py
+pip install -r requirements-dev.txt    # once: adds pytest
+pytest                                 # all backend tests
+pytest tests/test_search.py            # one file
+pytest -k duplicate                    # tests with "duplicate" in the name
 ```
 
-Inserts a document, chunks and embeds it, confirms a similarity search
-against the stored vectors returns it, then cleans up. The first run
-downloads the embedding model (~90MB, one-time, cached after that), so it
-needs network access to huggingface.co.
+Run it from the `backend/` folder, with Postgres and pgvector running. The
+tests use the real embedding model, so the first run downloads it (~90 MB,
+cached after that). Every test deletes the documents it creates, so your own
+documents are left alone. To keep the tests in a completely separate
+database, create an empty one and set `TEST_DATABASE_URL` to its URL.
+
+For a quick run with no model download, set `KV_FAKE_EMBEDDINGS=1` (search
+ranking is rougher, but every test still passes). The same `pytest` command
+runs in GitHub Actions on every push and pull request (`.github/workflows/ci.yml`),
+against a throwaway Postgres with pgvector. The tests are in `tests/`:
+
+| File | Covers |
+|---|---|
+| `test_models.py` | tables, chunk cascade |
+| `test_pipeline.py` | chunking, embeddings, pgvector similarity (KV-13/14/15) |
+| `test_search.py` | semantic search ranking and validation (KV-16) |
+| `test_enrichment.py` | tags and summaries (KV-21) |
+| `test_delete.py` | `DELETE /documents/{id}` |
+| `test_upload_validation.py` | upload error cases (KV-24) |
+| `test_duplicate_upload.py` | duplicate detection (KV-25) |
+| `test_browse_api.py` | filters, `/tags`, document detail (KV-26) |
+| `test_responsiveness.py` | searches during an upload, model loaded at startup (KV-33) |
 
 ## Upload errors
 
@@ -147,10 +168,6 @@ A file sent with a generic type (`application/octet-stream` or none) is
 judged by its extension. `GET /health` reports the active limit as
 `max_upload_mb`.
 
-```bash
-python test_upload_validation.py
-```
-
 ### Duplicate uploads
 
 Each document is stored with a fingerprint of its text (`content_hash`,
@@ -174,10 +191,6 @@ Once every copy is deleted the content can be uploaded again.
 does the same upgrade when it starts). It adds the `content_hash` column and
 fills it in for documents uploaded earlier. It is safe to re-run.
 
-```bash
-python test_duplicate_upload.py
-```
-
 ## Responsiveness and startup
 
 `POST /upload` does its slow work (reading the PDF, chunking, embedding,
@@ -191,7 +204,6 @@ offline), the server still starts, logs the error, and tries again on first
 use.
 
 ```bash
-python test_responsiveness.py      # no model needed; checks searches during an upload
 python bench_responsiveness.py     # real timings, against a running server (python main.py)
 ```
 
@@ -210,19 +222,14 @@ key, cost, or extra service.
 - If tagging ever fails, the upload still succeeds and the fields stay null.
 
 ```bash
-python test_enrichment.py          # check it works
 python backfill_enrichment.py      # fill in documents uploaded before KV-21
 python backfill_enrichment.py --all  # redo every document
 ```
 
 ## Search
 
-```bash
-python test_search.py
-```
-
-Uploads three small documents on different topics, searches them, and
-checks the right one ranks first. Cleans up after itself.
+The search tests upload three small documents on different topics, search them, and
+check that the right one ranks first.
 
 Example request (also available in `/docs`):
 
@@ -297,10 +304,6 @@ Each item in `GET /documents` has `id`, `filename`, `content_type`,
 
 `GET /tags` returns `[{"tag": "recipes", "count": 4}, ...]`, most common
 first (ties A to Z). "Recipes" and "recipes" count as one tag.
-
-```bash
-python test_browse_api.py
-```
 
 ## Next steps
 
