@@ -73,5 +73,6 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm install
-      - name: Placeholder test step
-        run: echo "No frontend tests yet - Vitest suite added in an upcoming sprint."
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
