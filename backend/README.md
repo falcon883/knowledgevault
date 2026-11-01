@@ -11,6 +11,9 @@ summaries, and the browse API used by the React frontend (see the
   required (no default credentials in the code), the allowed browser origins
   are set with `CORS_ORIGINS`, and `GET /health` checks the database. See
   [Configuration](#configuration).
+- **KV-35**: the backend has a `Dockerfile`, and `docker-compose.yml` in the
+  repo root starts Postgres with pgvector and the backend with one command, so
+  nobody has to install Postgres or pgvector by hand. See [Setup](#setup).
 
 ## Sprint 3: upload validation, duplicate detection, browse and preview API
 
@@ -63,6 +66,52 @@ instruction to finalize the vector database choice in Sprint 1-2
   risk called out in the Charter's risk table (Section 3.5).
 
 ## Setup
+
+### With Docker (recommended)
+
+From the repo root:
+
+```bash
+docker compose up --build
+```
+
+This starts Postgres 16 with pgvector and the backend, creates the tables,
+and serves the API at `http://localhost:8000`. What happens, in order:
+
+1. `db` starts (the `pgvector/pgvector:pg16` image) and waits until it accepts
+   connections.
+2. `backend` starts, runs `python init_db.py` (enables pgvector, creates any
+   missing tables; safe to re-run), then starts uvicorn.
+3. Compose marks `backend` healthy once `GET /health` answers 200.
+
+The embedding model is downloaded when the image is built (about 90 MB), so the
+container itself does not need internet access to start.
+
+| Command | What it does |
+|---|---|
+| `docker compose up --build` | Build if needed and start (add `-d` to run in the background) |
+| `docker compose logs -f backend` | Follow the backend log |
+| `docker compose down` | Stop; documents are kept in the `pgdata` volume |
+| `docker compose down -v` | Stop and delete the database |
+| `docker compose up -d db` | Start only Postgres, to run the backend or the tests on your machine |
+
+Postgres is published on `localhost:5433` (not 5432, which a locally installed
+Postgres usually uses). To run the tests or `python main.py` against it, point
+`DATABASE_URL` at that port:
+
+```
+DATABASE_URL=postgresql+psycopg2://knowledgevault:knowledgevault@localhost:5433/knowledgevault
+```
+
+Changed code? Run `docker compose up --build` again to rebuild the image. The
+Docker setup passes the settings from [Configuration](#configuration) as
+environment variables (`CORS_ORIGINS`, `MAX_UPLOAD_MB`; see the top of
+`docker-compose.yml`), and the database credentials in it are for local
+development only.
+
+### Setup without Docker
+
+Use this if you would rather run the backend directly on your machine.
 
 ### 1. Install Postgres and the pgvector extension
 
@@ -174,7 +223,9 @@ pytest tests/test_search.py            # one file
 pytest -k duplicate                    # tests with "duplicate" in the name
 ```
 
-Run it from the `backend/` folder, with Postgres and pgvector running. The
+Run it from the `backend/` folder, with Postgres and pgvector running (for
+example `docker compose up -d db` from the repo root, with `DATABASE_URL` set
+to the port 5433 URL shown in [Setup](#with-docker-recommended)). The
 tests use the real embedding model, so the first run downloads it (~90 MB,
 cached after that). Every test deletes the documents it creates, so your own
 documents are left alone. To keep the tests in a completely separate

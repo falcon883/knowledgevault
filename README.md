@@ -32,24 +32,31 @@ local sentence-transformers model, so there are no API keys or per-call costs.
 | [`/backend`](./backend) | FastAPI service, database models, embedding and search code, and the pytest suite. See its [README](./backend/README.md) for details. |
 | [`/frontend`](./frontend) | React app built with Vite: Search, Browse and Capture screens. |
 | [`/docs`](./docs) | Project Charter, Vision/Roadmap/Release Plan, sprint feedback. |
-| [`/.github/workflows`](./.github/workflows) | CI: runs the backend tests on every push and pull request. |
+| [`docker-compose.yml`](./docker-compose.yml) | Starts Postgres with pgvector and the backend with one command (see Getting started). |
+| [`/.github/workflows`](./.github/workflows) | CI: runs the backend tests, builds the Docker stack and checks it, on every push and pull request. |
 
 ## Getting started
 
-You need Python 3.11+, Node 20+, and Postgres 16 with the pgvector extension.
+You need [Docker](https://docs.docker.com/get-docker/) (Docker Desktop on
+Windows and macOS) and Node 20+ for the frontend.
 
-**Backend** (full steps, including installing Postgres, are in the [backend README](./backend/README.md#setup))
+**Backend and database** (one command, from the repo root)
 ```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env               # required: holds DATABASE_URL (check it matches your Postgres)
-python init_db.py                  # creates the tables
-python main.py
+docker compose up --build
 ```
-Runs at `http://localhost:8000` (interactive API docs at `/docs`). The first
-start downloads the embedding model (about 90 MB).
+The first run builds the backend image and downloads the embedding model
+(a few minutes). After that it starts in seconds. The API runs at
+`http://localhost:8000` (interactive docs at `/docs`) and the tables are
+created for you. Your documents are kept in a Docker volume, so
+`docker compose down` stops everything without losing them; use
+`docker compose down -v` to wipe the database too. Postgres is reachable from
+your machine on port 5433, so it does not clash with a Postgres you may
+already have on 5432. Settings you can override are listed at the top of
+`docker-compose.yml`.
+
+Prefer to run the backend without Docker? Install Python 3.11+ and Postgres 16
+with pgvector, then follow the
+[backend README](./backend/README.md#setup-without-docker).
 
 **Frontend**
 ```bash
@@ -60,12 +67,13 @@ npm run dev
 Runs at `http://localhost:5173` and talks to the backend at
 `http://localhost:8000`. To point it somewhere else, set `VITE_API_URL`.
 
-**Tests**
+**Tests** (need Python 3.11+ and the database from `docker compose up -d db`)
 ```bash
 cd backend
 pip install -r requirements-dev.txt
-pytest
+DATABASE_URL=postgresql+psycopg2://knowledgevault:knowledgevault@localhost:5433/knowledgevault pytest
 ```
+More on running the tests is in the [backend README](./backend/README.md#running-the-tests).
 
 ## API endpoints
 
@@ -85,6 +93,7 @@ Request and response details are in the [backend README](./backend/README.md#end
 
 Release 2 (Sprint 3 of the roadmap) is in progress: upload validation,
 duplicate detection, browse filters and previews, and automated tests and CI
-are done, and the UX refinements and the pilot session are next. AWS
-deployment and user accounts are planned for Sprint 4. See the roadmap in
+are done. Sprint 4 is under way: settings from environment variables and
+Docker are in, and AWS deployment, user accounts, the pilot session and
+end-to-end tests are next. See the roadmap in
 [`/docs`](./docs) for the full plan.
