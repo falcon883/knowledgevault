@@ -1,0 +1,58 @@
+# KnowledgeVault: Postgres (with pgvector) and the backend, with one command.
+#
+#     docker compose up --build        # first run builds the image (a few minutes)
+#     docker compose down              # stop; your documents are kept
+#     docker compose down -v           # stop and delete the database volume
+#
+# The API is then at http://localhost:8000 (docs at /docs). The frontend still
+# runs with `npm run dev` in frontend/ (http://localhost:5173).
+#
+# Optional overrides (shell environment or a .env file next to this one):
+#     BACKEND_PORT   host port for the API            (default 8000)
+#     DB_PORT        host port for Postgres           (default 5433, so it does
+#                    not clash with a Postgres already installed on your machine)
+#     CORS_ORIGINS   browser origins allowed to call the API, comma-separated
+#     MAX_UPLOAD_MB  largest upload accepted          (default 10)
+#
+# The database credentials below are for local development only.
+
+name: knowledgevault
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: knowledgevault
+      POSTGRES_PASSWORD: knowledgevault
+      POSTGRES_DB: knowledgevault
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knowledgevault -d knowledgevault"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://knowledgevault:knowledgevault@db:5432/knowledgevault
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    # Healthy once /health answers 200, which needs the database to be reachable.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+volumes:
+  pgdata:
