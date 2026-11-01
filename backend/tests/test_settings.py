@@ -1,5 +1,6 @@
 """
 KV-37: settings come from the environment, and /health checks the database.
+KV-42 adds the SECRET_KEY and number settings.
 """
 
 import pytest
@@ -40,6 +41,29 @@ def test_no_database_credentials_are_hard_coded():
     source = Path(settings.__file__).parent.joinpath("database.py").read_text()
     assert "postgresql+psycopg2://" not in source
     assert "knowledgevault:knowledgevault" not in source
+
+
+def test_secret_key_must_be_long_enough():
+    with pytest.raises(settings.ConfigError) as error:
+        settings.validate_secret_key("too-short")
+    assert "SECRET_KEY" in str(error.value) and "token_hex(32)" in str(error.value)
+    assert settings.validate_secret_key("x" * 32) == "x" * 32
+
+
+def test_the_app_has_a_usable_secret_key():
+    assert len(settings.SECRET_KEY) >= settings.MIN_SECRET_KEY_LENGTH
+
+
+def test_int_settings_use_the_default_and_reject_bad_values(monkeypatch):
+    monkeypatch.delenv("KV_TEST_NUMBER", raising=False)
+    assert settings.int_env("KV_TEST_NUMBER", default=24, minimum=1, maximum=100) == 24
+    monkeypatch.setenv("KV_TEST_NUMBER", " 12 ")
+    assert settings.int_env("KV_TEST_NUMBER", default=24, minimum=1, maximum=100) == 12
+    for bad in ["many", "1.5", "0", "101"]:
+        monkeypatch.setenv("KV_TEST_NUMBER", bad)
+        with pytest.raises(settings.ConfigError) as error:
+            settings.int_env("KV_TEST_NUMBER", default=24, minimum=1, maximum=100)
+        assert "KV_TEST_NUMBER" in str(error.value)
 
 
 @pytest.mark.parametrize(

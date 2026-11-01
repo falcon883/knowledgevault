@@ -28,6 +28,9 @@ jobs:
 
     env:
       DATABASE_URL: postgresql+psycopg2://knowledgevault:knowledgevault@localhost:5432/knowledgevault
+      # Throwaway values for the test run only (KV-42).
+      SECRET_KEY: ci-only-secret-key-not-used-anywhere-else-0123456789
+      BCRYPT_ROUNDS: "4"
 
     defaults:
       run:
@@ -87,7 +90,7 @@ jobs:
       # KV-41: make sure the server setup files stay valid
       - name: Check the server (AWS) setup files
         run: |
-          POSTGRES_PASSWORD=ci API_HOST=localhost CORS_ORIGINS=http://localhost:5173 \
+          POSTGRES_PASSWORD=ci SECRET_KEY=ci API_HOST=localhost CORS_ORIGINS=http://localhost:5173 \
             docker compose -f docker-compose.prod.yml config --quiet
           docker run --rm -e API_HOST=localhost \
             -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \

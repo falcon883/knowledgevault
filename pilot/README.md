@@ -15,9 +15,14 @@ this folder holds the sample documents and the script that prepares the app.
 With the backend running (`python main.py` in `backend/`):
 
 ```bash
-python pilot/seed_library.py            # load the 10 background documents
-python pilot/seed_library.py --check    # dry run for the 8 target documents
+python pilot/seed_library.py --password <pilot password>            # load the 10 background documents
+python pilot/seed_library.py --password <pilot password> --check    # dry run for the 8 target documents
 ```
+
+Documents belong to an account (KV-42). The script signs in as the pilot account
+(`pilot@example.com` unless you pass `--email`), creating it the first time, so
+choose a password for it and have the volunteers sign in with that account.
+You can also set `PILOT_EMAIL` and `PILOT_PASSWORD` instead of the flags.
 
 `--check` uploads each target, runs two plain-language searches for it, prints
 where it ranked, and deletes the targets again. A target passes if it is in the

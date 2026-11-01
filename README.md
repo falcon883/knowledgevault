@@ -94,12 +94,18 @@ python deploy/smoke_test.py https://your-api-address     # or http://localhost:8
 | Endpoint | Purpose |
 |---|---|
 | `GET /health` | Status check: is the database reachable (503 if not), is the model loaded, upload limit |
+| `POST /auth/signup`, `POST /auth/login` | Create an account or sign in; returns a token |
+| `GET /auth/me` | The signed-in user |
 | `POST /upload` | Upload a PDF or text file |
-| `GET /documents` | List documents; optional `tag`, `since` and `sort` filters |
-| `GET /documents/{id}` | One document with its full text, for previews |
-| `GET /tags` | Every tag in use with its document count |
-| `POST /search` | Search by meaning |
-| `DELETE /documents/{id}` | Delete a document |
+| `GET /documents` | List your documents; optional `tag`, `since` and `sort` filters |
+| `GET /documents/{id}` | One of your documents with its full text, for previews |
+| `GET /tags` | Every tag in your documents with its document count |
+| `POST /search` | Search your documents by meaning |
+| `DELETE /documents/{id}` | Delete one of your documents |
+
+Everything except `/health`, signup and login needs `Authorization: Bearer <token>`,
+and each person sees only their own documents. Details are in the
+[backend README](./backend/README.md#accounts).
 
 Request and response details are in the [backend README](./backend/README.md#endpoints).
 
@@ -107,7 +113,7 @@ Request and response details are in the [backend README](./backend/README.md#end
 
 Release 2 (Sprint 3 of the roadmap) is in progress: upload validation,
 duplicate detection, browse filters and previews, and automated tests and CI
-are done. Sprint 4 is under way: settings from environment variables and
-Docker are in, and AWS deployment, user accounts, the pilot session and
-end-to-end tests are next. See the roadmap in
+are done. Sprint 4 is under way: settings from environment variables,
+Docker, the AWS deployment and user accounts are in, and the sign-in screens,
+the pilot session and end-to-end tests are next. See the roadmap in
 [`/docs`](./docs) for the full plan.

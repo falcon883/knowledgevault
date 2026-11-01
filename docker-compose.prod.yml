@@ -4,7 +4,7 @@
 #     docker compose -f docker-compose.prod.yml up -d --build
 #
 # Needs a .env file next to this one (copy .env.example) with API_HOST,
-# POSTGRES_PASSWORD and CORS_ORIGINS. Full steps: deploy/README.md.
+# POSTGRES_PASSWORD, SECRET_KEY and CORS_ORIGINS. Full steps: deploy/README.md.
 #
 # Differences from docker-compose.yml (local development):
 #   - only Caddy is reachable from outside (ports 80 and 443); Postgres and the
@@ -40,6 +40,7 @@ services:
       DATABASE_URL: postgresql+psycopg2://knowledgevault:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/knowledgevault
       CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
       interval: 10s

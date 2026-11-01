@@ -86,12 +86,15 @@ def test_content_can_be_uploaded_again_once_every_copy_is_deleted(client, upload
     assert upload("kvdup_again.txt", TEXT.encode()).status_code == 200
 
 
-def test_documents_from_before_the_hash_existed_are_backfilled(upload, db):
+def test_documents_from_before_the_hash_existed_are_backfilled(client, upload, db):
     legacy = Document(
+        user_id=client.user_id,
         filename="kvdup_legacy.txt", content_type="text/plain", size_bytes=10,
         extracted_text="Legacy   notes on\nsourdough starters.", content_hash=None,
     )
-    blank = Document(filename="kvdup_blank.txt", content_type="text/plain", size_bytes=0, extracted_text=None)
+    blank = Document(
+        user_id=client.user_id, filename="kvdup_blank.txt", content_type="text/plain", size_bytes=0, extracted_text=None
+    )
     db.add_all([legacy, blank])
     db.commit()
 

@@ -20,11 +20,12 @@ SPEC = [
 
 
 @pytest.fixture
-def library(db):
+def library(db, client):
     """The five documents above, created directly with tags and dates set by hand."""
     ids = {}
     for filename, tags, days, n_chunks, text in SPEC:
         doc = Document(
+            user_id=client.user_id,
             filename=filename,
             content_type="application/pdf" if filename.endswith(".pdf") else "text/plain",
             size_bytes=len(text),

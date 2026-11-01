@@ -13,8 +13,11 @@
 #                    not clash with a Postgres already installed on your machine)
 #     CORS_ORIGINS   browser origins allowed to call the API, comma-separated
 #     MAX_UPLOAD_MB  largest upload accepted          (default 10)
+#     SECRET_KEY     signs the sign-in tokens         (a fixed development key
+#                    is used if you do not set one)
 #
-# The database credentials below are for local development only.
+# The database credentials and the SECRET_KEY default below are for local
+# development only.
 
 name: knowledgevault
 
@@ -44,6 +47,7 @@ services:
       DATABASE_URL: postgresql+psycopg2://knowledgevault:knowledgevault@db:5432/knowledgevault
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
+      SECRET_KEY: ${SECRET_KEY:-development-only-secret-key-not-for-production}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     # Healthy once /health answers 200, which needs the database to be reachable.

@@ -10,7 +10,7 @@ $20 a month while it runs; new AWS accounts usually come with credits, so check
 |---|---|
 | `docker-compose.prod.yml` (repo root) | The three containers. Only Caddy is open to the internet. |
 | `deploy/Caddyfile` | Tells Caddy to get the HTTPS certificate and pass requests to the backend. |
-| `.env.example` (repo root) | The three settings the server needs: `API_HOST`, `POSTGRES_PASSWORD`, `CORS_ORIGINS`. |
+| `.env.example` (repo root) | The settings the server needs: `API_HOST`, `POSTGRES_PASSWORD`, `SECRET_KEY`, `CORS_ORIGINS`. |
 | `deploy/smoke_test.py` | Checks a running API end to end: health, upload, search, then deletes its own test document. |
 
 The console screens change now and then, so a button may be named a little
@@ -89,6 +89,7 @@ In `.env`, fill in:
 |---|---|
 | `API_HOST` | The Elastic IP with dashes, then `.sslip.io`. IP `3.91.12.45` becomes `3-91-12-45.sslip.io`. (sslip.io is a free service that turns that name into the IP, so you do not need a domain.) |
 | `POSTGRES_PASSWORD` | The password you just generated |
+| `SECRET_KEY` | Another random value, from `openssl rand -hex 32`. It signs the sign-in tokens, so keep it secret; changing it signs everyone out. |
 | `CORS_ORIGINS` | `http://localhost:5173` for now. When the frontend is deployed, add its address after a comma, for example `http://localhost:5173,https://app.example.com` |
 
 Save with `Ctrl+O`, `Enter`, then `Ctrl+X`. `.env` stays on the server and is
@@ -127,6 +128,25 @@ The tables are created on first start, so there is nothing else to set up.
 3. Use the deployed API from your local frontend: in `frontend/`, create a file
    named `.env.local` containing `VITE_API_URL=https://<API_HOST>`, run
    `npm run dev`, and open `http://localhost:5173`.
+
+## Updating a server that is already running
+
+Version 0.12.0 of the API (KV-42, accounts) needs one new setting. On the
+server, add a `SECRET_KEY` to `.env` once, then update as usual:
+
+```bash
+cd ~/knowledgevault
+echo "SECRET_KEY=$(openssl rand -hex 32)" >> .env
+git pull
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+The database is upgraded on start: a `users` table is added, and any documents
+already stored are given to a placeholder account. After that, every request
+except `/health` and `/docs` needs a token. Sign up with
+`POST /auth/signup`, then run
+`docker compose -f docker-compose.prod.yml exec backend python claim_documents.py you@example.com`
+if there were documents to keep.
 
 ## Everyday use
 

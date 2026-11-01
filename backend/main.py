@@ -20,6 +20,10 @@ worker thread) and loads the embedding model at startup.
 Sprint 4 starts with configuration (KV-37, see settings.py): the database URL
 and the allowed browser origins come from environment variables, and /health
 now checks the database as well as reporting the model.
+
+KV-42 adds accounts (see auth.py): /auth/signup, /auth/login and /auth/me, and
+every document route now needs a signed-in user and only touches that user's
+own documents. /health stays public.
 """
 
 import logging
@@ -41,7 +45,8 @@ from database import get_db
 from embeddings import embed_text, embed_texts
 from enrichment import enrich
 from init_db import upgrade_schema
-from models import Chunk, Document
+from auth import AuthError, get_current_user, router as auth_router
+from models import Chunk, Document, User
 from settings import CORS_ORIGINS
 from uploads import (
     MAX_UPLOAD_BYTES,
@@ -82,7 +87,7 @@ app = FastAPI(
     lifespan=lifespan,
     title="KnowledgeVault API",
     description="Backend service for the KnowledgeVault capstone project.",
-    version="0.11.0",
+    version="0.12.0",
 )
 
 app.add_middleware(
@@ -91,6 +96,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router)
+
+
+@app.exception_handler(AuthError)
+async def auth_error_handler(request: Request, exc: AuthError):
+    """Sign-in problems come back as {"detail": <message>, "code": <code>} (see auth.py)."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "code": exc.code},
+        headers=exc.headers,
+    )
+
 
 @app.exception_handler(UploadError)
 async def upload_error_handler(request: Request, exc: UploadError):
@@ -139,6 +157,7 @@ async def upload_document(
         False, description="Store the file even if the same content is already uploaded."
     ),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """
     Accept a document (PDF or plain text), extract its text, persist it
@@ -150,7 +169,9 @@ async def upload_document(
     unless the file passes. A file whose text matches a document already
     stored is refused with 409 duplicate_document (KV-25) unless
     `allow_duplicate=true` is passed. The document and its chunks are written in one
-    transaction, so a failure part way through leaves nothing behind.
+    transaction, so a failure part way through leaves nothing behind. The
+    document belongs to the signed-in user (KV-42), and "already uploaded"
+    means already uploaded by that user.
     """
     if file is None or not (file.filename or "").strip():
         raise UploadError(400, "no_file", "No file was uploaded.")
@@ -167,12 +188,13 @@ async def upload_document(
     # answering other requests, searches included, while a file is processed
     # (KV-33).
     return await run_in_threadpool(
-        ingest_document, db, file.filename, content_type, kind, contents, allow_duplicate
+        ingest_document, db, user.id, file.filename, content_type, kind, contents, allow_duplicate
     )
 
 
 def ingest_document(
     db: Session,
+    user_id: int,
     filename: str,
     content_type: str,
     kind: str,
@@ -187,7 +209,7 @@ def ingest_document(
     if not allow_duplicate:
         existing = db.execute(
             select(Document)
-            .where(Document.content_hash == text_hash)
+            .where(Document.user_id == user_id, Document.content_hash == text_hash)
             .order_by(Document.id)
             .options(defer(Document.extracted_text))
             .limit(1)
@@ -211,6 +233,7 @@ def ingest_document(
     try:
         chunk_vectors = embed_texts(chunk_texts)
         document = Document(
+            user_id=user_id,
             filename=filename,
             content_type=content_type,
             size_bytes=len(contents),
@@ -262,6 +285,19 @@ def ingest_document(
     }
 
 
+def get_own_document(db: Session, user: User, document_id: int) -> Document:
+    """
+    The signed-in user's document, or 404. Someone else's document gets the
+    same 404 as one that does not exist, so ids reveal nothing (KV-42).
+    """
+    document = db.scalar(
+        select(Document).where(Document.id == document_id, Document.user_id == user.id)
+    )
+    if document is None:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    return document
+
+
 def parse_tags(tags: str | None) -> list[str]:
     """Document.tags is stored as one comma-separated string."""
     return [tag.strip() for tag in (tags or "").split(",") if tag.strip()]
@@ -296,9 +332,10 @@ def list_documents(
         "newest", description="newest (default), oldest, or name (A to Z)."
     ),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """
-    List uploaded documents. Backs the browse screen (KV-17). With no
+    List the signed-in user's documents. Backs the browse screen (KV-17). With no
     parameters it returns everything, newest first, as it always has.
     KV-26 adds optional filters: `tag`, `since`, and `sort`. They combine.
     No pagination yet, since the corpus this project targets is small
@@ -307,6 +344,7 @@ def list_documents(
     query = (
         select(Document, func.count(Chunk.id))
         .outerjoin(Chunk, Chunk.document_id == Document.id)
+        .where(Document.user_id == user.id)
         .group_by(Document.id)
         # The text can be large and the list never shows it.
         .options(defer(Document.extracted_text))
@@ -342,15 +380,14 @@ def get_document(
         description="Cut the returned text to this many characters (for previews).",
     ),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """
     One document in full (KV-26): the list fields plus its extracted text,
     for previews. `truncated` is true when `max_chars` cut the text short;
     `text_length` is always the full length.
     """
-    document = db.get(Document, document_id)
-    if document is None:
-        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    document = get_own_document(db, user, document_id)
 
     chunk_count = db.scalar(
         select(func.count(Chunk.id)).where(Chunk.document_id == document_id)
@@ -369,15 +406,19 @@ def get_document(
 def list_tags(
     limit: int | None = Query(None, ge=1, le=500, description="Return only the top N tags."),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """
     Every tag in use with the number of documents that have it, most common
     first (ties A to Z). Tags are matched ignoring case, so "Recipes" and
-    "recipes" count as one. Backs the tag filter on the browse screen (KV-26).
+    "recipes" count as one. Only the signed-in user's documents are counted.
+    Backs the tag filter on the browse screen (KV-26).
     """
     counts: dict[str, int] = {}
     labels: dict[str, str] = {}
-    for tags in db.execute(select(Document.tags).where(Document.tags.is_not(None))).scalars():
+    for tags in db.execute(
+        select(Document.tags).where(Document.user_id == user.id, Document.tags.is_not(None))
+    ).scalars():
         for key in {tag.lower() for tag in parse_tags(tags)}:
             counts[key] = counts.get(key, 0) + 1
         for tag in parse_tags(tags):
@@ -413,7 +454,11 @@ SNIPPET_CHARS = 300
 
 
 @app.post("/search")
-def search_documents(request: SearchRequest, db: Session = Depends(get_db)):
+def search_documents(
+    request: SearchRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     """
     Semantic search (KV-16). Embeds the query with the same model used at
     upload time, finds the closest chunks by cosine distance in pgvector,
@@ -421,7 +466,7 @@ def search_documents(request: SearchRequest, db: Session = Depends(get_db)):
     similarity score (1.0 = identical meaning, around 0 = unrelated), and
     the document's tags/summary. Results below `min_score` (default 0.25)
     are left out so unrelated documents don't pad the list. Backs the
-    search screen (KV-18).
+    search screen (KV-18). Only the signed-in user's documents are searched.
     """
     query = request.query.strip()
     if not query:
@@ -432,7 +477,8 @@ def search_documents(request: SearchRequest, db: Session = Depends(get_db)):
 
     rows = db.execute(
         select(Chunk, distance.label("distance"))
-        .where(Chunk.embedding.is_not(None))
+        .join(Document, Document.id == Chunk.document_id)
+        .where(Document.user_id == user.id, Chunk.embedding.is_not(None))
         .order_by(distance)
         .limit(CANDIDATE_CHUNKS)
     ).all()
@@ -468,14 +514,17 @@ def search_documents(request: SearchRequest, db: Session = Depends(get_db)):
 
 
 @app.delete("/documents/{document_id}")
-def delete_document(document_id: int, db: Session = Depends(get_db)):
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     """
-    Delete a document and everything derived from it (its chunks and their
-    embeddings), so it no longer shows up in /documents or /search.
+    Delete one of the signed-in user's documents and everything derived from
+    it (its chunks and their embeddings), so it no longer shows up in
+    /documents or /search.
     """
-    document = db.get(Document, document_id)
-    if document is None:
-        raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+    document = get_own_document(db, user, document_id)
 
     filename = document.filename
     db.delete(document)  # chunks go with it (cascade on Document.chunks)

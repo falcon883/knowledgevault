@@ -15,6 +15,10 @@ summaries, and the browse API used by the React frontend (see the
   repo root starts Postgres with pgvector and the backend with one command, so
   nobody has to install Postgres or pgvector by hand. See [Setup](#setup).
 
+- **KV-42**: user accounts. People sign up and sign in, and every document
+  belongs to one account: upload, list, view, tags, search and delete only
+  touch the signed-in user's own documents. See [Accounts](#accounts).
+
 ## Sprint 3: upload validation, duplicate detection, browse and preview API
 
 - **KV-24**: every bad upload is rejected with a clear message before
@@ -142,18 +146,21 @@ source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Copy `.env.example` to `.env` and check that `DATABASE_URL` matches your
-Postgres (the example matches the user, password and database from step 2).
-The server will not start without it:
+Copy `.env.example` to `.env`, check that `DATABASE_URL` matches your
+Postgres (the example matches the user, password and database from step 2),
+and fill in `SECRET_KEY` with a random value, which signs the sign-in tokens
+(`python -c "import secrets; print(secrets.token_hex(32))"` prints one). The
+server will not start without both:
 
 ```bash
 cp .env.example .env               # Windows: copy .env.example .env
 ```
 
-Or export the variable instead of using a file:
+Or export the variables instead of using a file:
 
 ```bash
 export DATABASE_URL="postgresql+psycopg2://knowledgevault:knowledgevault@localhost:5432/knowledgevault"
+export SECRET_KEY="<the random value>"
 ```
 
 ### 4. Create the tables
@@ -185,14 +192,18 @@ file. `.env` is in `.gitignore`, so your passwords stay out of the repo.
 |---|---|---|---|
 | `DATABASE_URL` | yes | none | Postgres connection URL, `postgresql+psycopg2://USER:PASSWORD@HOST:PORT/DATABASE`. The database needs the pgvector extension. |
 | `CORS_ORIGINS` | no | `http://localhost:5173` | Browser origins allowed to call the API, comma-separated, no trailing slash. Add the deployed frontend's URL here, e.g. `http://localhost:5173,https://app.example.com`. |
+| `SECRET_KEY` | yes | none | Signs the sign-in tokens. At least 32 characters and kept secret; generate one with `python -c "import secrets; print(secrets.token_hex(32))"`. Changing it signs everyone out. |
+| `ACCESS_TOKEN_HOURS` | no | `24` | How long a sign-in lasts. |
 | `MAX_UPLOAD_MB` | no | `10` | Largest upload accepted. See [Upload errors](#upload-errors). |
 
-Only for tests: `TEST_DATABASE_URL` (use a separate database) and
-`KV_FAKE_EMBEDDINGS=1` (skip the model download). See
+Only for tests: `TEST_DATABASE_URL` (use a separate database),
+`KV_FAKE_EMBEDDINGS=1` (skip the model download) and `BCRYPT_ROUNDS` (faster
+password hashing; the tests set it for you). See
 [Running the tests](#running-the-tests).
 
-If `DATABASE_URL` is missing the server stops at startup with a message that
-says how to set it, rather than falling back to made-up credentials.
+If `DATABASE_URL` or `SECRET_KEY` is missing the server stops at startup with
+a message that says how to set it, rather than falling back to made-up
+credentials. **After pulling KV-42, add a `SECRET_KEY` to your `backend/.env`.**
 
 ### Health check
 
@@ -248,6 +259,73 @@ against a throwaway Postgres with pgvector. The tests are in `tests/`:
 | `test_browse_api.py` | filters, `/tags`, document detail (KV-26) |
 | `test_responsiveness.py` | searches during an upload, model loaded at startup (KV-33) |
 | `test_settings.py` | required settings, CORS origins, `/health` with the database up and down (KV-37) |
+| `test_auth.py` | signup, login, tokens, 401 errors, one user not seeing another's documents, upgrading an old database (KV-42) |
+
+## Accounts
+
+Each person has their own account, and each document belongs to one account.
+This is what the frontend needs to know (code in `auth.py`).
+
+**Sign up or sign in**, both with a JSON body `{"email": "...", "password": "..."}`:
+
+```
+POST /auth/signup   ->  201
+POST /auth/login    ->  200
+```
+```json
+{
+  "access_token": "eyJhbGciOi...",
+  "token_type": "bearer",
+  "user": { "id": 7, "email": "you@example.com" }
+}
+```
+
+**Send the token with every other request:**
+
+```
+Authorization: Bearer eyJhbGciOi...
+```
+
+`GET /auth/me` returns the user for a token, which is a cheap way to check that
+a token saved in the browser still works. A token lasts `ACCESS_TOKEN_HOURS`
+(24 by default); after that the user signs in again.
+
+Emails are stored in lowercase, so `You@Example.com` and `you@example.com` are
+one account. Passwords need 8 to 72 characters and are stored only as bcrypt
+hashes.
+
+**Errors** use the same shape as upload errors, `{"detail": <message>, "code": <code>}`.
+The frontend can branch on `code`:
+
+| Status | `code` | When |
+|---|---|---|
+| 401 | `not_authenticated` | No token was sent |
+| 401 | `invalid_token` | The token is damaged, signed with another key, or its user no longer exists |
+| 401 | `token_expired` | The token is old. Sign in again |
+| 401 | `invalid_credentials` | Wrong email or password (the same answer for both, so it does not reveal which emails have accounts) |
+| 409 | `email_taken` | Signup with an email that already has an account |
+| 422 | `invalid_email`, `weak_password`, `password_too_long` | Signup input that is not acceptable |
+
+All 401 responses also carry `WWW-Authenticate: Bearer`.
+
+**One user cannot see another's documents.** Every document query is filtered
+by the signed-in user. Asking for someone else's document returns the same 404
+as one that does not exist, so ids reveal nothing, and search only looks at
+your own documents. "Already uploaded" (see [Duplicate uploads](#duplicate-uploads))
+means already uploaded by you.
+
+**Upgrading an existing database.** `python init_db.py` (and the server at
+start-up) creates the `users` table, adds `documents.user_id`, and gives every
+document that had no owner to a placeholder user, `default@knowledgevault.local`,
+that nobody can sign in as. To keep those documents, sign up and then move
+them to your account:
+
+```bash
+python claim_documents.py you@example.com
+```
+
+**Not included yet:** password reset, email confirmation, and limits on how
+often someone can try to sign in. There is also no way to delete an account.
 
 ## Upload errors
 
@@ -383,13 +461,19 @@ Response:
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /health` | Status check: database reachable (503 if not), model loaded, upload limit |
+| `GET /health` | Status check: database reachable (503 if not), model loaded, upload limit. Public |
+| `POST /auth/signup` | Create an account; returns a token. Public |
+| `POST /auth/login` | Sign in; returns a token. Public |
+| `GET /auth/me` | The signed-in user |
 | `POST /upload` | Upload a PDF or text file; persists it, chunks it, embeds each chunk, adds tags and a summary |
-| `POST /search` | Semantic search: returns the best-matching documents for a query |
-| `GET /documents` | List uploaded documents (backs the browse screen). Optional filters below |
-| `GET /documents/{id}` | One document with its full extracted text, for previews |
-| `GET /tags` | Every tag in use with its document count, for the tag filter |
-| `DELETE /documents/{id}` | Delete a document and its chunks |
+| `POST /search` | Semantic search over your documents: returns the best-matching ones for a query |
+| `GET /documents` | List your documents (backs the browse screen). Optional filters below |
+| `GET /documents/{id}` | One of your documents with its full extracted text, for previews |
+| `GET /tags` | Every tag in your documents with its document count, for the tag filter |
+| `DELETE /documents/{id}` | Delete one of your documents and its chunks |
+
+Everything except `/health`, `/auth/signup`, `/auth/login` and the `/docs` page
+needs a token (see [Accounts](#accounts)).
 
 ### Browsing: `GET /documents`, `GET /documents/{id}`, `GET /tags`
 
