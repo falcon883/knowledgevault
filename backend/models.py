@@ -22,15 +22,41 @@ from database import Base
 
 EMBEDDING_DIM = 384
 
+# Stored as the password hash of the "default" user that the schema upgrade
+# creates to own documents from before accounts existed. It is not a valid
+# bcrypt hash, so nobody can sign in as that user.
+UNUSABLE_PASSWORD = "!"
+
 
 def utcnow():
     return datetime.now(timezone.utc)
+
+
+class User(Base):
+    """An account (KV-42). Documents belong to exactly one user."""
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(254), nullable=False, unique=True, index=True)  # stored lowercase
+    password_hash = Column(String, nullable=False)  # bcrypt, never the password itself
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    documents = relationship("Document", back_populates="owner")
+
+    def __repr__(self):
+        return f"<User id={self.id} email={self.email!r}>"
 
 
 class Document(Base):
     __tablename__ = "documents"
 
     id = Column(Integer, primary_key=True, index=True)
+
+    # KV-42: whose document this is. Every query in main.py filters on it, so
+    # one user never sees or searches another user's documents.
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
     filename = Column(String, nullable=False)
     content_type = Column(String, nullable=False)
     size_bytes = Column(Integer, nullable=False)
@@ -46,6 +72,7 @@ class Document(Base):
     tags = Column(Text, nullable=True)  # comma-separated for now; revisit if needed
     summary = Column(Text, nullable=True)
 
+    owner = relationship("User", back_populates="documents")
     chunks = relationship(
         "Chunk", back_populates="document", cascade="all, delete-orphan"
     )

@@ -7,6 +7,11 @@ Load the pilot test library, and check that the target documents can be found.
 Needs the backend running (python main.py in backend/). Both steps use the
 real API, so what you see here is what a volunteer will get.
 
+Documents belong to an account (KV-42), so both steps sign in first, creating
+the account the first time. Give it with --email and --password (or the
+PILOT_EMAIL and PILOT_PASSWORD environment variables); the volunteers sign in
+with the same account to see the library this script loads.
+
 --check uploads each of the 8 target documents, runs two plain-language
 searches for each (worded differently from the document), reports where the
 target came out in the results, and then deletes the targets it uploaded. A
@@ -15,6 +20,7 @@ the wording of that document rather than the searches.
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -34,6 +40,20 @@ QUERIES = {
     "T8_how_solar_panels_work": ["how do rooftop panels make electricity", "turn sunlight into power for my house"],
 }
 TOP_N = 3
+
+
+def sign_in(client: httpx.Client, email: str, password: str) -> bool:
+    """Log in, or create the account the first time. Sets the token on the client."""
+    r = client.post("/auth/login", json={"email": email, "password": password})
+    if r.status_code == 401:
+        r = client.post("/auth/signup", json={"email": email, "password": password})
+        if r.status_code == 201:
+            print(f"Created the account {email}.")
+    if r.status_code not in (200, 201):
+        print(f"Could not sign in as {email}: {r.status_code} {r.text}")
+        return False
+    client.headers["Authorization"] = f"Bearer {r.json()['access_token']}"
+    return True
 
 
 def upload(client: httpx.Client, path: Path) -> httpx.Response:
@@ -97,7 +117,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--check", action="store_true", help="dry run: find each target document by search")
     parser.add_argument("--url", default="http://localhost:8000", help="backend address (default %(default)s)")
+    parser.add_argument("--email", default=os.getenv("PILOT_EMAIL", "pilot@example.com"), help="pilot account (default %(default)s)")
+    parser.add_argument("--password", default=os.getenv("PILOT_PASSWORD"), help="pilot account password (or set PILOT_PASSWORD)")
     args = parser.parse_args()
+    if not args.password:
+        print("Give the pilot account's password with --password or the PILOT_PASSWORD environment variable.")
+        return 2
 
     with httpx.Client(base_url=args.url, timeout=180) as client:
         try:
@@ -107,6 +132,8 @@ def main() -> int:
             return 1
         if not health.get("model_loaded"):
             print("Note: the embedding model is not loaded yet, so the first request will be slow.\n")
+        if not sign_in(client, args.email, args.password):
+            return 1
         return check(client) if args.check else seed(client)
 
 

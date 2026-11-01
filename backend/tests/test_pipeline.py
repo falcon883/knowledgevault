@@ -31,8 +31,9 @@ def test_embedding_in_batches_matches_embedding_one_by_one():
         assert embed_text(text) == pytest.approx(vector, abs=1e-5)
 
 
-def test_chunk_embed_store_and_search(db):
+def test_chunk_embed_store_and_search(db, client):
     doc = Document(
+        user_id=client.user_id,
         filename="pipeline_check.txt",
         content_type="text/plain",
         size_bytes=len(TEXT),

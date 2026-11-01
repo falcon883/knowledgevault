@@ -1,10 +1,19 @@
 """KV-7: the schema round-trips correctly."""
 
-from models import Chunk, Document
+from models import Chunk, Document, User
+
+
+def make_user(db) -> User:
+    user = User(email="models-test@example.test", password_hash="!")
+    db.add(user)
+    db.commit()
+    return user
 
 
 def test_document_and_chunk_round_trip(db):
+    owner = make_user(db)
     doc = Document(
+        user_id=owner.id,
         filename="sample.pdf",
         content_type="application/pdf",
         size_bytes=1426,
@@ -19,10 +28,14 @@ def test_document_and_chunk_round_trip(db):
     assert len(fetched.chunks) == 1
     assert fetched.chunks[0].text == doc.extracted_text
     assert fetched.uploaded_at is not None
+    assert fetched.owner.email == "models-test@example.test"
 
 
 def test_deleting_a_document_deletes_its_chunks(db):
-    doc = Document(filename="gone.txt", content_type="text/plain", size_bytes=3, extracted_text="abc")
+    owner = make_user(db)
+    doc = Document(
+        user_id=owner.id, filename="gone.txt", content_type="text/plain", size_bytes=3, extracted_text="abc"
+    )
     db.add(doc)
     db.commit()
     db.add(Chunk(document_id=doc.id, chunk_index=0, text="abc"))

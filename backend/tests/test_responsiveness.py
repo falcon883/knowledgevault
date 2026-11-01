@@ -72,11 +72,20 @@ def test_requests_are_served_during_a_large_upload(live_server):
     sentences = [" ".join(rng.choice(vocab) for _ in range(12)).capitalize() + "." for _ in range(900)]
     text = f"Responsiveness check {uuid.uuid4()}.\n" + " ".join(sentences)
 
+    # Every document route needs a signed-in user (KV-42).
+    signup = httpx.post(
+        f"{base}/auth/signup",
+        json={"email": f"kv33-{uuid.uuid4().hex[:8]}@example.test", "password": "correct horse battery"},
+        timeout=30,
+    )
+    assert signup.status_code == 201, signup.text
+    auth = {"Authorization": f"Bearer {signup.json()['access_token']}"}
+
     result = {}
 
     def do_upload():
         started = time.perf_counter()
-        r = httpx.post(f"{base}/upload", files={"file": ("kv33_big.txt", text.encode(), "text/plain")}, timeout=120)
+        r = httpx.post(f"{base}/upload", files={"file": ("kv33_big.txt", text.encode(), "text/plain")}, headers=auth, timeout=120)
         result["status"] = r.status_code
         result["seconds"] = time.perf_counter() - started
 
@@ -87,14 +96,14 @@ def test_requests_are_served_during_a_large_upload(live_server):
     # Other endpoints answer straight away while the upload runs.
     started = time.perf_counter()
     assert httpx.get(f"{base}/health", timeout=30).status_code == 200
-    assert httpx.get(f"{base}/documents", timeout=30).status_code == 200
+    assert httpx.get(f"{base}/documents", headers=auth, timeout=30).status_code == 200
     quick = time.perf_counter() - started
     assert uploader.is_alive(), "upload finished too soon for this check"
 
     search_times = []
     while uploader.is_alive():
         started = time.perf_counter()
-        r = httpx.post(f"{base}/search", json={"query": "word12 word99", "min_score": 0}, timeout=60)
+        r = httpx.post(f"{base}/search", json={"query": "word12 word99", "min_score": 0}, headers=auth, timeout=60)
         took = time.perf_counter() - started
         assert r.status_code == 200, r.text
         if uploader.is_alive():  # only count searches that really overlapped the upload

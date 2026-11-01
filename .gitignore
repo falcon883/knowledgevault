@@ -17,3 +17,7 @@ __pycache__/
 # Node
 node_modules/
 dist/
+
+# Private keys (e.g. the AWS SSH key): never commit these
+*.pem
+*.key
