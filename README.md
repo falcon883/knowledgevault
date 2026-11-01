@@ -33,6 +33,7 @@ local sentence-transformers model, so there are no API keys or per-call costs.
 | [`/frontend`](./frontend) | React app built with Vite: Search, Browse and Capture screens. |
 | [`/docs`](./docs) | Project Charter, Vision/Roadmap/Release Plan, sprint feedback. |
 | [`docker-compose.yml`](./docker-compose.yml) | Starts Postgres with pgvector and the backend with one command (see Getting started). |
+| [`/deploy`](./deploy) | AWS deployment: step-by-step guide, HTTPS config and an end-to-end check script. Used with [`docker-compose.prod.yml`](./docker-compose.prod.yml). |
 | [`/.github/workflows`](./.github/workflows) | CI: runs the backend tests, builds the Docker stack and checks it, on every push and pull request. |
 
 ## Getting started
@@ -74,6 +75,19 @@ pip install -r requirements-dev.txt
 DATABASE_URL=postgresql+psycopg2://knowledgevault:knowledgevault@localhost:5433/knowledgevault pytest
 ```
 More on running the tests is in the [backend README](./backend/README.md#running-the-tests).
+
+## Deployment
+
+The backend and database run on one small AWS server (EC2) with HTTPS from
+Caddy, using `docker-compose.prod.yml`. Settings and secrets live in a `.env`
+file on the server, never in the repo (`.env.example` lists them). The full
+step-by-step guide, from creating the AWS account to checking the deployed API,
+is in [`deploy/README.md`](./deploy/README.md). To check any running API end
+to end (health, upload, search):
+
+```bash
+python deploy/smoke_test.py https://your-api-address     # or http://localhost:8000
+```
 
 ## API endpoints
 

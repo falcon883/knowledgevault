@@ -73,17 +73,25 @@ jobs:
       - name: Build and start the stack
         run: docker compose up -d --build --wait --wait-timeout 300
 
-      - name: Health check
-        run: curl -fsS http://localhost:8000/health
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-      - name: Upload a document and find it by meaning
+      # health, upload, search, delete: the same script used to check the AWS server
+      - name: Smoke test the running stack
         run: |
-          echo "The universe is about 13.8 billion years old, estimated from the cosmic microwave background." > cosmos.txt
-          curl -fsS -F "file=@cosmos.txt;type=text/plain" http://localhost:8000/upload
-          curl -fsS -X POST http://localhost:8000/search \
-            -H "Content-Type: application/json" \
-            -d '{"query": "how old is the universe"}' | tee search.json
-          grep -q cosmos.txt search.json
+          pip install httpx==0.27.2
+          python deploy/smoke_test.py http://localhost:8000
+
+      # KV-41: make sure the server setup files stay valid
+      - name: Check the server (AWS) setup files
+        run: |
+          POSTGRES_PASSWORD=ci API_HOST=localhost CORS_ORIGINS=http://localhost:5173 \
+            docker compose -f docker-compose.prod.yml config --quiet
+          docker run --rm -e API_HOST=localhost \
+            -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2 caddy validate --config /etc/caddy/Caddyfile
 
       - name: Show container logs if something failed
         if: failure()

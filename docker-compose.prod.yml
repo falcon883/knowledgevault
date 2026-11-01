@@ -1,0 +1,71 @@
+# KnowledgeVault on a single server (KV-41): Postgres, the backend, and Caddy
+# in front of them for HTTPS.
+#
+#     docker compose -f docker-compose.prod.yml up -d --build
+#
+# Needs a .env file next to this one (copy .env.example) with API_HOST,
+# POSTGRES_PASSWORD and CORS_ORIGINS. Full steps: deploy/README.md.
+#
+# Differences from docker-compose.yml (local development):
+#   - only Caddy is reachable from outside (ports 80 and 443); Postgres and the
+#     backend are not published
+#   - the database password comes from .env instead of being fixed
+#   - everything restarts on its own after a crash or a server reboot
+
+name: knowledgevault-prod
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: knowledgevault
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: knowledgevault
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knowledgevault -d knowledgevault"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://knowledgevault:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/knowledgevault
+      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      API_HOST: ${API_HOST:?Set API_HOST in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Keeps the HTTPS certificate across restarts (asking for a new one every
+      # time would hit Let's Encrypt's rate limits).
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
