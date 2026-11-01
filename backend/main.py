@@ -16,6 +16,10 @@ what the refined Browse and Search screens need: GET /tags, tag/date/sort
 filters on GET /documents, and GET /documents/{id}. KV-25 refuses duplicate
 uploads. KV-33 keeps the API responsive during uploads (the work runs on a
 worker thread) and loads the embedding model at startup.
+
+Sprint 4 starts with configuration (KV-37, see settings.py): the database URL
+and the allowed browser origins come from environment variables, and /health
+now checks the database as well as reporting the model.
 """
 
 import logging
@@ -28,7 +32,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, defer
 
 import embeddings
@@ -38,6 +42,7 @@ from embeddings import embed_text, embed_texts
 from enrichment import enrich
 from init_db import upgrade_schema
 from models import Chunk, Document
+from settings import CORS_ORIGINS
 from uploads import (
     MAX_UPLOAD_BYTES,
     MAX_UPLOAD_MB,
@@ -77,12 +82,12 @@ app = FastAPI(
     lifespan=lifespan,
     title="KnowledgeVault API",
     description="Backend service for the KnowledgeVault capstone project.",
-    version="0.10.0",
+    version="0.11.0",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -100,15 +105,31 @@ async def upload_error_handler(request: Request, exc: UploadError):
 
 
 @app.get("/health")
-def health_check():
-    """Basic status endpoint used to confirm the service is running."""
-    return {
-        "status": "ok",
+def health_check(db: Session = Depends(get_db)):
+    """
+    Status check for the frontend indicator and for load balancers.
+
+    Runs a trivial query to confirm the database is reachable. If it is not,
+    the response is 503 with status "error", so a load balancer stops sending
+    traffic here. `model_loaded` is informational: the embedding model loads at
+    startup and retries on first use, so a missing model does not fail the check.
+    """
+    try:
+        db.execute(text("SELECT 1"))
+        database_ok = True
+    except Exception:
+        logger.exception("Health check: the database is not reachable")
+        database_ok = False
+
+    body = {
+        "status": "ok" if database_ok else "error",
         "service": "knowledgevault-backend",
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "max_upload_mb": MAX_UPLOAD_MB,
+        "database": "ok" if database_ok else "unavailable",
         "model_loaded": embeddings.is_loaded(),
+        "max_upload_mb": MAX_UPLOAD_MB,
     }
+    return JSONResponse(status_code=200 if database_ok else 503, content=body)
 
 
 @app.post("/upload")

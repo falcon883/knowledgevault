@@ -44,7 +44,7 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env               # only needed if your database settings differ
+cp .env.example .env               # required: holds DATABASE_URL (check it matches your Postgres)
 python init_db.py                  # creates the tables
 python main.py
 ```
@@ -71,7 +71,7 @@ pytest
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /health` | Status check (also reports the upload limit and whether the model is loaded) |
+| `GET /health` | Status check: is the database reachable (503 if not), is the model loaded, upload limit |
 | `POST /upload` | Upload a PDF or text file |
 | `GET /documents` | List documents; optional `tag`, `since` and `sort` filters |
 | `GET /documents/{id}` | One document with its full text, for previews |

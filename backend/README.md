@@ -4,6 +4,14 @@ FastAPI service for KnowledgeVault: ingestion, semantic search, tags and
 summaries, and the browse API used by the React frontend (see the
 [root README](../README.md) for the whole project).
 
+## Sprint 4: configuration
+
+- **KV-37**: settings come from environment variables, so the same code runs
+  on a laptop, in Docker and on AWS (`settings.py`). `DATABASE_URL` is now
+  required (no default credentials in the code), the allowed browser origins
+  are set with `CORS_ORIGINS`, and `GET /health` checks the database. See
+  [Configuration](#configuration).
+
 ## Sprint 3: upload validation, duplicate detection, browse and preview API
 
 - **KV-24**: every bad upload is rejected with a clear message before
@@ -85,8 +93,15 @@ source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Copy `.env.example` to `.env` (or just export the variable) if your
-Postgres isn't on `localhost:5432` with the default credentials above:
+Copy `.env.example` to `.env` and check that `DATABASE_URL` matches your
+Postgres (the example matches the user, password and database from step 2).
+The server will not start without it:
+
+```bash
+cp .env.example .env               # Windows: copy .env.example .env
+```
+
+Or export the variable instead of using a file:
 
 ```bash
 export DATABASE_URL="postgresql+psycopg2://knowledgevault:knowledgevault@localhost:5432/knowledgevault"
@@ -110,6 +125,45 @@ On start the server loads the embedding model (a few seconds; the very first
 run also downloads it, about 90 MB), so it is ready before the first request.
 The log line `Embedding model loaded in X.Xs` shows when it is. `GET /health`
 reports `"model_loaded": true` once it is.
+
+## Configuration
+
+All settings are environment variables. For local work put them in
+`backend/.env` (copy `.env.example`); a real environment variable overrides the
+file. `.env` is in `.gitignore`, so your passwords stay out of the repo.
+
+| Setting | Required | Default | What it does |
+|---|---|---|---|
+| `DATABASE_URL` | yes | none | Postgres connection URL, `postgresql+psycopg2://USER:PASSWORD@HOST:PORT/DATABASE`. The database needs the pgvector extension. |
+| `CORS_ORIGINS` | no | `http://localhost:5173` | Browser origins allowed to call the API, comma-separated, no trailing slash. Add the deployed frontend's URL here, e.g. `http://localhost:5173,https://app.example.com`. |
+| `MAX_UPLOAD_MB` | no | `10` | Largest upload accepted. See [Upload errors](#upload-errors). |
+
+Only for tests: `TEST_DATABASE_URL` (use a separate database) and
+`KV_FAKE_EMBEDDINGS=1` (skip the model download). See
+[Running the tests](#running-the-tests).
+
+If `DATABASE_URL` is missing the server stops at startup with a message that
+says how to set it, rather than falling back to made-up credentials.
+
+### Health check
+
+`GET /health` runs a trivial query against the database:
+
+```json
+{
+  "status": "ok",
+  "service": "knowledgevault-backend",
+  "timestamp": "2026-11-01T14:03:11+00:00",
+  "database": "ok",
+  "model_loaded": true,
+  "max_upload_mb": 10.0
+}
+```
+
+If the database cannot be reached the response is `503` with
+`"status": "error"` and `"database": "unavailable"`, so a load balancer stops
+sending traffic to that server. `model_loaded` is informational only: the model
+loads at startup and retries on first use, so it does not fail the check.
 
 ## Running the tests
 
@@ -142,6 +196,7 @@ against a throwaway Postgres with pgvector. The tests are in `tests/`:
 | `test_duplicate_upload.py` | duplicate detection (KV-25) |
 | `test_browse_api.py` | filters, `/tags`, document detail (KV-26) |
 | `test_responsiveness.py` | searches during an upload, model loaded at startup (KV-33) |
+| `test_settings.py` | required settings, CORS origins, `/health` with the database up and down (KV-37) |
 
 ## Upload errors
 
@@ -277,7 +332,7 @@ Response:
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /health` | Status check |
+| `GET /health` | Status check: database reachable (503 if not), model loaded, upload limit |
 | `POST /upload` | Upload a PDF or text file; persists it, chunks it, embeds each chunk, adds tags and a summary |
 | `POST /search` | Semantic search: returns the best-matching documents for a query |
 | `GET /documents` | List uploaded documents (backs the browse screen). Optional filters below |

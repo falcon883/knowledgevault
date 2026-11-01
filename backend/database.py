@@ -1,25 +1,16 @@
 """
 KnowledgeVault backend - database connection setup.
 
-Sprint 2 switches the default from SQLite to Postgres, because the
-`chunks.embedding` column now uses pgvector (see models.py), which is a
-Postgres extension and has no SQLite equivalent. Point DATABASE_URL at
-your own local Postgres instance; see backend/README.md for setup.
+The app uses Postgres because the `chunks.embedding` column uses pgvector
+(see models.py), which is a Postgres extension and has no SQLite equivalent.
+The connection URL comes from the DATABASE_URL setting (see settings.py); there
+is no default, so no credentials are kept in the code. See backend/README.md.
 """
-
-import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+psycopg2://knowledgevault:knowledgevault@localhost:5432/knowledgevault",
-)
+from settings import DATABASE_URL
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
