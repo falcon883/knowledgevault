@@ -1,0 +1,6 @@
+# Caddy gets and renews the HTTPS certificate for API_HOST by itself, and passes
+# every request on to the backend container. API_HOST comes from .env.
+{$API_HOST} {
+	encode gzip
+	reverse_proxy backend:8000
+}
