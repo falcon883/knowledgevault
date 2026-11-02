@@ -24,6 +24,10 @@ summaries, and the browse API used by the React frontend (see the
   with a versioned, testable migration. Existing databases keep all their data.
   See [Database migrations](#database-migrations).
 
+- **KV-38**: documents are split into chunks at sentence boundaries instead of
+  every 800 characters, so snippets start and end at natural points. A script
+  re-chunks documents already stored. See [Chunking](#chunking).
+
 ## Sprint 3: upload validation, duplicate detection, browse and preview API
 
 - **KV-24**: every bad upload is rejected with a clear message before
@@ -44,7 +48,7 @@ Builds on Sprint 1 (KV-5/6/7). This sprint:
 
 - **KV-13**: `POST /upload` now actually persists a `Document` row instead
   of just returning extracted text.
-- **KV-14**: document text is split into overlapping chunks (`chunking.py`).
+- **KV-14**: document text is split into overlapping chunks (`chunking.py`; sentence-aware since KV-38).
 - **KV-15**: each chunk is embedded locally (`embeddings.py`) and stored in
   a **pgvector** column for semantic similarity search.
 
@@ -303,6 +307,8 @@ against a throwaway Postgres with pgvector. The tests are in `tests/`:
 |---|---|
 | `test_models.py` | tables, chunk cascade |
 | `test_pipeline.py` | chunking, embeddings, pgvector similarity (KV-13/14/15) |
+| `test_chunking.py` | chunks cut at sentence boundaries, stay within 800 characters, overlap, and lose nothing, including tables and text with no punctuation (KV-38) |
+| `test_rechunk.py` | re-chunking stored documents safely, and the before-and-after comparison (KV-38) |
 | `test_search.py` | semantic search ranking and validation (KV-16) |
 | `test_enrichment.py` | tags and summaries (KV-21) |
 | `test_delete.py` | `DELETE /documents/{id}` |
@@ -431,6 +437,47 @@ Once every copy is deleted the content can be uploaded again.
 Databases from before this existed are upgraded by migration `0001`, which
 adds the `content_hash` column and fills it in for documents uploaded earlier,
 so they count as duplicates too.
+
+## Chunking
+
+Each document is cut into chunks of at most 800 characters, and every chunk is
+embedded and searched on its own (`chunking.py`). Chunks are cut at natural
+breaks, so a search snippet reads cleanly and a match is not lost across a cut:
+
+- Text is split into paragraphs and sentences. A period after `Dr.`, `e.g.`, an
+  initial or a decimal point does not end a sentence.
+- Sentences are packed into a chunk until the next one would not fit. If a
+  paragraph break falls in the second half of a chunk, the chunk ends there.
+- The next chunk starts with the last sentence or two of the previous one (up
+  to 150 characters), so an idea that straddles a cut is whole in at least one
+  chunk.
+- Text with no sentence breaks, such as a table or a schedule, is cut between
+  lines, then between words. Only a single "word" longer than 800 characters
+  (a long base64 string, say) is cut by length.
+
+**Documents stored before KV-38** still have the old fixed-size chunks until you
+re-chunk them. This rebuilds the chunks and embeddings from the text already
+saved (no files needed), one document at a time, so a failure leaves that
+document as it was. It is safe to run again, and it covers every user's
+documents:
+
+```bash
+python rechunk_documents.py --dry-run     # show what would change, change nothing
+python rechunk_documents.py               # do it
+python rechunk_documents.py --document 12 15   # only these documents
+```
+
+On the server: `docker compose -f docker-compose.prod.yml exec backend python rechunk_documents.py`.
+Tags and summaries are left as they are.
+
+**Seeing the difference.** With the real model (not `KV_FAKE_EMBEDDINGS`), this
+chunks every stored document both ways in memory, searches each way, and prints
+the best snippet per document side by side, plus how many chunks start and end
+like a sentence. It changes nothing in the database:
+
+```bash
+python compare_chunking.py "how do I feed a sourdough starter" "what did we decide about the budget"
+```
 
 ## Responsiveness and startup
 
