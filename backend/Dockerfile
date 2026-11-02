@@ -35,6 +35,6 @@ USER app
 
 EXPOSE 8000
 
-# init_db.py enables pgvector and creates any missing tables (safe to re-run),
-# then the API starts.
+# init_db.py runs the database migrations (enables pgvector, creates or upgrades
+# the tables; safe to re-run), then the API starts.
 CMD ["sh", "-c", "python init_db.py && exec uvicorn main:app --host 0.0.0.0 --port 8000"]

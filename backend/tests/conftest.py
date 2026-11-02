@@ -31,12 +31,12 @@ os.environ.setdefault("BCRYPT_ROUNDS", "4")
 import numpy as np  # noqa: E402
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import select, text  # noqa: E402
+from sqlalchemy import select  # noqa: E402
 
 import embeddings  # noqa: E402
 import main  # noqa: E402
 import uploads  # noqa: E402
-from database import Base, SessionLocal, engine  # noqa: E402
+from database import SessionLocal  # noqa: E402
 from init_db import upgrade_schema  # noqa: E402
 from models import Document, User  # noqa: E402
 
@@ -57,13 +57,7 @@ if os.getenv("KV_FAKE_EMBEDDINGS") == "1":
 
 @pytest.fixture(scope="session", autouse=True)
 def database():
-    """Make sure pgvector, the tables and the latest columns exist."""
-    try:
-        with engine.begin() as conn:
-            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-    except Exception:
-        pass  # already installed, and this user may not be allowed to run it
-    Base.metadata.create_all(bind=engine)
+    """Bring the test database up to date with the migrations (KV-36)."""
     upgrade_schema()
 
 

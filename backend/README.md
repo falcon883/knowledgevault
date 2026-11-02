@@ -19,6 +19,11 @@ summaries, and the browse API used by the React frontend (see the
   belongs to one account: upload, list, view, tags, search and delete only
   touch the signed-in user's own documents. See [Accounts](#accounts).
 
+- **KV-36**: the database schema is now changed with Alembic migrations
+  instead of code that patches tables at start-up, so a model change comes
+  with a versioned, testable migration. Existing databases keep all their data.
+  See [Database migrations](#database-migrations).
+
 ## Sprint 3: upload validation, duplicate detection, browse and preview API
 
 - **KV-24**: every bad upload is rejected with a clear message before
@@ -84,8 +89,9 @@ and serves the API at `http://localhost:8000`. What happens, in order:
 
 1. `db` starts (the `pgvector/pgvector:pg16` image) and waits until it accepts
    connections.
-2. `backend` starts, runs `python init_db.py` (enables pgvector, creates any
-   missing tables; safe to re-run), then starts uvicorn.
+2. `backend` starts, runs `python init_db.py` (applies the database
+   migrations: enables pgvector, creates or upgrades the tables; safe to
+   re-run), then starts uvicorn.
 3. Compose marks `backend` healthy once `GET /health` answers 200.
 
 The embedding model is downloaded when the image is built (about 90 MB), so the
@@ -134,8 +140,8 @@ sudo -u postgres psql -c "CREATE USER knowledgevault WITH PASSWORD 'knowledgevau
 sudo -u postgres psql -c "CREATE DATABASE knowledgevault OWNER knowledgevault;"
 ```
 
-(`init_db.py` below runs `CREATE EXTENSION IF NOT EXISTS vector` for you,
-no need to do it by hand.)
+(The first migration runs `CREATE EXTENSION IF NOT EXISTS vector` for you, no
+need to do it by hand.)
 
 ### 3. Python environment
 
@@ -163,11 +169,15 @@ export DATABASE_URL="postgresql+psycopg2://knowledgevault:knowledgevault@localho
 export SECRET_KEY="<the random value>"
 ```
 
-### 4. Create the tables
+### 4. Create or upgrade the tables
 
 ```bash
 python init_db.py
 ```
+
+This applies the database migrations (see
+[Database migrations](#database-migrations)). Run it again after pulling a
+change that touches the database; it is safe to re-run.
 
 ### 5. Run the server
 
@@ -181,6 +191,48 @@ On start the server loads the embedding model (a few seconds; the very first
 run also downloads it, about 90 MB), so it is ready before the first request.
 The log line `Embedding model loaded in X.Xs` shows when it is. `GET /health`
 reports `"model_loaded": true` once it is.
+
+## Database migrations
+
+The schema is managed with [Alembic](https://alembic.sqlalchemy.org). Each
+migration is a small file in `migrations/versions/` that changes the database
+one step, and the database remembers which ones have run (in a table called
+`alembic_version`). Run these from the `backend/` folder; they read
+`DATABASE_URL` and `SECRET_KEY` from `.env` like the app does.
+
+| Task | Command |
+|---|---|
+| Bring the database up to date | `python init_db.py` (same as `alembic upgrade head`) |
+| See which migration it is at | `alembic current` |
+| List all migrations | `alembic history` |
+| Check the models and migrations agree | `alembic check` |
+| Undo the latest migration | `alembic downgrade -1` |
+
+Normally you do nothing: Docker runs `init_db.py` before the API starts, and
+the API applies pending migrations itself when it starts. All pending
+migrations run in one transaction, so if one fails the database is left as it
+was.
+
+**When you change a model** (add a column, say):
+
+1. Edit `models.py`.
+2. `alembic revision --autogenerate -m "add notes to documents"` writes a new
+   file in `migrations/versions/`.
+3. Read it and fix what it got wrong. Autogenerate cannot tell a rename from a
+   drop plus an add, and it does not move data.
+4. `python init_db.py`, then `pytest`. A test fails if the models and the
+   migrations disagree, so a forgotten migration is caught before CI.
+5. Commit the migration together with the model change.
+
+**Databases that already exist** (made before Alembic, by the old `init_db.py`)
+need nothing special. Migrations `0001` and `0002` check what is already there,
+so the first run keeps every document, chunk and account, and records the
+database as up to date. Newer migrations are ordinary and do not need those
+checks. Never import app code into a migration: it has to keep meaning what it
+meant on the day it was written.
+
+`alembic downgrade` is for throwaway databases: undoing `0001` deletes every
+document and chunk, and undoing `0002` forgets who owned what.
 
 ## Configuration
 
@@ -259,7 +311,8 @@ against a throwaway Postgres with pgvector. The tests are in `tests/`:
 | `test_browse_api.py` | filters, `/tags`, document detail (KV-26) |
 | `test_responsiveness.py` | searches during an upload, model loaded at startup (KV-33) |
 | `test_settings.py` | required settings, CORS origins, `/health` with the database up and down (KV-37) |
-| `test_auth.py` | signup, login, tokens, 401 errors, one user not seeing another's documents, upgrading an old database (KV-42) |
+| `test_auth.py` | signup, login, tokens, 401 errors, one user not seeing another's documents (KV-42) |
+| `test_migrations.py` | migrations build the schema the models describe; databases from before Alembic or before accounts keep their documents and chunks; a failed upgrade changes nothing (KV-36) |
 
 ## Accounts
 
@@ -314,8 +367,8 @@ as one that does not exist, so ids reveal nothing, and search only looks at
 your own documents. "Already uploaded" (see [Duplicate uploads](#duplicate-uploads))
 means already uploaded by you.
 
-**Upgrading an existing database.** `python init_db.py` (and the server at
-start-up) creates the `users` table, adds `documents.user_id`, and gives every
+**Upgrading an existing database.** Migration `0002` (applied by
+`python init_db.py` and by the server at start-up) creates the `users` table, adds `documents.user_id`, and gives every
 document that had no owner to a placeholder user, `default@knowledgevault.local`,
 that nobody can sign in as. To keep those documents, sign up and then move
 them to your account:
@@ -375,9 +428,9 @@ So a renamed copy, or the same text with different spacing or line breaks,
 is caught too. To store it anyway, send `POST /upload?allow_duplicate=true`.
 Once every copy is deleted the content can be uploaded again.
 
-**After pulling this change, run `python init_db.py` once** (the server also
-does the same upgrade when it starts). It adds the `content_hash` column and
-fills it in for documents uploaded earlier. It is safe to re-run.
+Databases from before this existed are upgraded by migration `0001`, which
+adds the `content_hash` column and fills it in for documents uploaded earlier,
+so they count as duplicates too.
 
 ## Responsiveness and startup
 
