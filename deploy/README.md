@@ -131,22 +131,28 @@ The tables are created on first start, so there is nothing else to set up.
 
 ## Updating a server that is already running
 
-Version 0.12.0 of the API (KV-42, accounts) needs one new setting. On the
-server, add a `SECRET_KEY` to `.env` once, then update as usual:
-
 ```bash
 cd ~/knowledgevault
-echo "SECRET_KEY=$(openssl rand -hex 32)" >> .env
 git pull
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-The database is upgraded on start: a `users` table is added, and any documents
-already stored are given to a placeholder account. After that, every request
-except `/health` and `/docs` needs a token. Sign up with
-`POST /auth/signup`, then run
+The database is upgraded when the backend starts, by the migrations in
+`backend/migrations` (see the backend README, "Database migrations"), so there
+is nothing else to run. They keep all existing documents and accounts. If an
+upgrade fails, nothing is changed and `docker compose ... logs backend` says why.
+
+**Coming from a version before accounts (0.12.0)?** Add a `SECRET_KEY` to `.env`
+once, before the commands above:
+
+```bash
+echo "SECRET_KEY=$(openssl rand -hex 32)" >> .env
+```
+
+Documents stored before accounts existed are given to a placeholder account.
+Sign up with `POST /auth/signup`, then run
 `docker compose -f docker-compose.prod.yml exec backend python claim_documents.py you@example.com`
-if there were documents to keep.
+to move them to your account.
 
 ## Everyday use
 

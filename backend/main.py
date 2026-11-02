@@ -63,12 +63,10 @@ logger = logging.getLogger("knowledgevault")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Add any columns this version needs to an existing database (KV-25), so
-    # pulling new code never leaves the API running against an old schema.
+    # Apply any database migrations this version needs (KV-36), so pulling new
+    # code never leaves the API running against an old schema.
     try:
-        filled = upgrade_schema()
-        if filled:
-            logger.info("Backfilled content_hash for %d document(s)", filled)
+        upgrade_schema()
     except Exception:
         logger.exception("Could not update the database schema; run python init_db.py")
 

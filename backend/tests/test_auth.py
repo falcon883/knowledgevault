@@ -7,12 +7,12 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 import pytest
-from sqlalchemy import create_engine, inspect, select, text
+from sqlalchemy import select
 
 import auth
 import settings
 from conftest import PASSWORD
-from init_db import DEFAULT_USER_EMAIL, upgrade_schema
+from init_db import DEFAULT_USER_EMAIL
 from models import User
 
 TEXT = "Sourdough starters need regular feeding with flour and water to stay lively."
@@ -277,116 +277,3 @@ def test_signing_in_again_shows_the_same_documents(client, anonymous_client):
     token = login(anonymous_client, client.email).json()["access_token"]
     listed = anonymous_client.get("/documents", headers=bearer(token)).json()
     assert [d["id"] for d in listed] == [mine]
-
-
-# --- upgrading a database from before accounts existed ---------------------------
-
-# chunks.embedding is a pgvector column in the real database; the upgrade never touches it,
-# so plain TEXT is enough here. (No semicolons inside the SQL: it is split on them.)
-OLD_SCHEMA = """
-CREATE TABLE documents (
-    id SERIAL PRIMARY KEY,
-    filename VARCHAR NOT NULL,
-    content_type VARCHAR NOT NULL,
-    size_bytes INTEGER NOT NULL,
-    extracted_text TEXT,
-    uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    content_hash VARCHAR(64),
-    tags TEXT,
-    summary TEXT
-);
-CREATE INDEX ix_documents_content_hash ON documents (content_hash);
-CREATE TABLE chunks (
-    id SERIAL PRIMARY KEY,
-    document_id INTEGER NOT NULL REFERENCES documents (id),
-    chunk_index INTEGER NOT NULL,
-    text TEXT NOT NULL,
-    embedding TEXT
-);
-"""
-
-
-@pytest.fixture
-def old_database():
-    """
-    An engine on a scratch schema holding the tables as Sprint 3 left them. The
-    schema is the only one on its search path, so nothing here can see or change
-    the real tables, whatever the developer's own database contains.
-    """
-    scratch = "kv42_upgrade_scratch"
-    admin = create_engine(settings.DATABASE_URL)
-    with admin.begin() as conn:
-        conn.execute(text(f"DROP SCHEMA IF EXISTS {scratch} CASCADE"))
-        conn.execute(text(f"CREATE SCHEMA {scratch}"))
-    engine = create_engine(
-        settings.DATABASE_URL, connect_args={"options": f"-csearch_path={scratch}"}
-    )
-    with engine.begin() as conn:
-        for statement in OLD_SCHEMA.split(";"):
-            if statement.strip():
-                conn.execute(text(statement))
-        conn.execute(
-            text(
-                "INSERT INTO documents (filename, content_type, size_bytes, extracted_text) VALUES "
-                "('old_one.txt', 'text/plain', 3, 'one'), ('old_two.txt', 'text/plain', 3, 'two')"
-            )
-        )
-    yield engine
-    engine.dispose()
-    with admin.begin() as conn:
-        conn.execute(text(f"DROP SCHEMA {scratch} CASCADE"))
-    admin.dispose()
-
-
-def test_the_upgrade_gives_existing_documents_to_the_default_user(old_database):
-    upgrade_schema(old_database)
-
-    with old_database.connect() as conn:
-        default_id = conn.execute(
-            text("SELECT id FROM users WHERE email = :e"), {"e": DEFAULT_USER_EMAIL}
-        ).scalar_one()
-        owners = conn.execute(text("SELECT DISTINCT user_id FROM documents")).scalars().all()
-        password_hash = conn.execute(
-            text("SELECT password_hash FROM users WHERE id = :id"), {"id": default_id}
-        ).scalar_one()
-    assert owners == [default_id], "both old documents belong to the default user"
-    assert not password_hash.startswith("$2"), "nobody can sign in as the default user"
-
-    column = next(c for c in inspect(old_database).get_columns("documents") if c["name"] == "user_id")
-    assert column["nullable"] is False, "user_id is required once everything has an owner"
-    assert "ix_documents_user_id" in {i["name"] for i in inspect(old_database).get_indexes("documents")}
-
-
-def test_the_upgrade_is_safe_to_run_twice(old_database):
-    upgrade_schema(old_database)
-    upgrade_schema(old_database)
-    with old_database.connect() as conn:
-        assert conn.execute(text("SELECT count(*) FROM users")).scalar_one() == 1
-        assert conn.execute(text("SELECT count(*) FROM documents WHERE user_id IS NULL")).scalar_one() == 0
-
-
-def test_the_upgrade_creates_no_default_user_when_there_is_nothing_to_give(old_database):
-    with old_database.begin() as conn:
-        conn.execute(text("DELETE FROM documents"))
-    upgrade_schema(old_database)
-    with old_database.connect() as conn:
-        assert conn.execute(text("SELECT count(*) FROM users")).scalar_one() == 0
-
-
-def test_claiming_moves_the_default_users_documents(old_database, monkeypatch):
-    import claim_documents
-    from sqlalchemy.orm import sessionmaker
-
-    upgrade_schema(old_database)
-    with old_database.begin() as conn:
-        conn.execute(
-            text("INSERT INTO users (email, password_hash, created_at) VALUES ('me@example.test', 'x', now())")
-        )
-    monkeypatch.setattr(claim_documents, "SessionLocal", sessionmaker(bind=old_database))
-
-    assert claim_documents.main("nobody@example.test") == 1, "needs an existing account"
-    assert claim_documents.main("ME@example.test") == 0
-    with old_database.connect() as conn:
-        me = conn.execute(text("SELECT id FROM users WHERE email = 'me@example.test'")).scalar_one()
-        assert conn.execute(text("SELECT DISTINCT user_id FROM documents")).scalars().all() == [me]
-    assert claim_documents.main("me@example.test") == 0, "safe to run again"

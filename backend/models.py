@@ -65,7 +65,7 @@ class Document(Base):
 
     # KV-25: fingerprint of the extracted text (see uploads.content_hash), used
     # to spot a file that was already uploaded. Null only for rows not yet
-    # backfilled by init_db.upgrade_schema().
+    # backfilled by migration 0001.
     content_hash = Column(String(64), nullable=True, index=True)
 
     # Auto-tagging/summarization results (KV-21) land here once built.
