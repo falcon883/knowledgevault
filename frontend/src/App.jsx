@@ -28,6 +28,14 @@ import './app.css';
  * /health, so the shell gates on sign-in: with no stored token the auth
  * screen replaces the workspace, and any 401 from the API (expired or
  * invalid token) clears the token and returns the user to sign-in.
+ *
+ * KV-40 — the active tab is mirrored in the URL hash (#/capture,
+ * #/browse, #/search), so a refresh keeps the tab and the browser's
+ * Back/Forward buttons move between tabs. Hash routing is deliberate:
+ * the app will be statically hosted (S3/CloudFront), where history-API
+ * rewrites are not guaranteed. The gate is unaffected: a signed-out
+ * user sees the auth screen whatever the hash says, and the tab named
+ * in the hash is the one shown after sign-in.
  */
 
 const TABS = [
@@ -36,8 +44,22 @@ const TABS = [
   { id: 'search', label: 'Search', Screen: SearchScreen, Icon: IconSearch },
 ];
 
+// KV-40 — hash <-> tab mapping. The hash looks like "#/browse"; anything
+// else (empty, unknown tab) is treated as "no tab named" by tabFromHash.
+const TAB_IDS = new Set(TABS.map((t) => t.id));
+
+function tabFromHash() {
+  const raw = window.location.hash.replace(/^#\/?/, '');
+  return TAB_IDS.has(raw) ? raw : null;
+}
+
+function hashForTab(id) {
+  return `#/${id}`;
+}
+
 function App() {
-  const [tab, setTab] = useState('search');
+  // KV-40 — start on the tab named in the URL; Capture when it names none.
+  const [tab, setTab] = useState(() => tabFromHash() ?? 'capture');
   const [backendOk, setBackendOk] = useState(null);
   const [signedIn, setSignedIn] = useState(() => Boolean(getToken()));
   // Bumped every time Browse is navigated to from the upload flow, so its
@@ -60,9 +82,40 @@ function App() {
     };
   }, [tab, signedIn]);
 
+  // KV-40 — on first load, normalise the URL to the active tab's hash.
+  // replaceState, not a hash assignment, so the landing URL is rewritten
+  // in place instead of gaining a duplicate history entry.
+  useEffect(() => {
+    if (tabFromHash() !== tab) {
+      window.history.replaceState(null, '', hashForTab(tab));
+    }
+    // Runs once on mount; `tab` here is the initial tab by construction.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // KV-40 — Back/Forward (and a hand-edited hash) move the tab. Hash
+  // changes caused by selectTab below also land here; the functional
+  // update makes those a no-op because the tab already matches.
+  useEffect(() => {
+    function onHashChange() {
+      const next = tabFromHash();
+      if (next) setTab((cur) => (next === cur ? cur : next));
+    }
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  // Single path for switching tabs: state first, then the URL. Assigning
+  // location.hash pushes a history entry — which is what makes Back
+  // work — and fires hashchange, handled as a no-op above.
+  function selectTab(next) {
+    setTab(next);
+    if (tabFromHash() !== next) window.location.hash = hashForTab(next);
+  }
+
   function navigate(next) {
     if (next === 'browse') setBrowseRefresh((n) => n + 1);
-    setTab(next);
+    selectTab(next);
   }
 
   function signOut() {
@@ -115,7 +168,7 @@ function App() {
                   type="button"
                   className="kv-tab"
                   aria-pressed={tab === t.id}
-                  onClick={() => setTab(t.id)}
+                  onClick={() => selectTab(t.id)}
                 >
                   <TabIcon size={17} />
                   {t.label}
