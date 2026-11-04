@@ -772,3 +772,35 @@
   .kv-search-row { flex-direction: column; }
   .kv-search-row .kv-btn { width: 100%; }
 }
+
+/* --- Auth (KV-43) -------------------------------------------------------- */
+
+.kv-main-auth {
+  padding: 2.5rem 1rem 4rem;
+}
+
+.kv-auth-wrap {
+  max-width: 430px;
+  margin: 0 auto;
+}
+
+.kv-auth-card {
+  padding: 2rem;
+}
+
+.kv-auth-mark {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 11px;
+  margin-bottom: 1rem;
+}
+
+.kv-auth-error {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.kv-auth-submit {
+  width: 100%;
+}
