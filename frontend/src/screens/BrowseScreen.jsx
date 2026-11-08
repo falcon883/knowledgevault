@@ -253,7 +253,7 @@ export default function BrowseScreen({ refreshSignal = 0 } = {}) {
           </div>
 
           {allTags.length > 0 && (
-            <div style={{ marginTop: '0.75rem' }} aria-label="Filter by tag">
+            <div style={{ marginTop: '0.75rem' }} role="group" aria-label="Filter by tag">
               {allTags.map((t) => (
                 <button
                   key={t}
@@ -334,7 +334,7 @@ export default function BrowseScreen({ refreshSignal = 0 } = {}) {
                   </button>
                   {rowConfirmId === d.id ? (
                     <div className="kv-doc-confirm" role="alert">
-                      <span>Delete "{d.filename}"?</span>
+                      <span>Delete &ldquo;{d.filename}&rdquo;?</span>
                       <button
                         type="button"
                         className="kv-btn kv-btn-danger kv-btn-small"

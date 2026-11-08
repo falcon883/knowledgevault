@@ -28,6 +28,7 @@
 }
 
 .kv-brand {
+  margin: 0;
   font-size: 1.2rem;
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -209,7 +210,12 @@
 .kv-textarea:focus-visible,
 .kv-select:focus-visible,
 .kv-tab:focus-visible,
-.kv-btn:focus-visible {
+.kv-btn:focus-visible,
+.kv-kind-btn:focus-visible,
+.kv-chip:focus-visible,
+.kv-doc-main:focus-visible,
+.kv-drop:focus-visible,
+.kv-doc-delete:focus-visible {
   outline: 2px solid #1d4ed8;
   outline-offset: 2px;
 }
@@ -503,7 +509,7 @@
   border-radius: 8px;
   border: 1px solid transparent;
   background: transparent;
-  color: #93a1b8;
+  color: #64748b;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -803,4 +809,17 @@
 
 .kv-auth-submit {
   width: 100%;
+}
+
+/* KV-44 — honour reduced-motion: the UI's transitions are decorative
+   (hover fades, the busy spinner), so still them for users who ask
+   their OS for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
