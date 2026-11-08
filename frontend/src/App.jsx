@@ -36,6 +36,14 @@ import './app.css';
  * rewrites are not guaranteed. The gate is unaffected: a signed-out
  * user sees the auth screen whatever the hash says, and the tab named
  * in the hash is the one shown after sign-in.
+ *
+ * KV-39 — the frontend carries a Vitest + React Testing Library suite
+ * (auth session, API client, excerpt helper, auth screen, app shell)
+ * and ESLint; CI runs lint, tests and a production build.
+ *
+ * KV-44 — accessibility pass: labelled controls throughout, visible
+ * focus outlines on every interactive element, a real <h1>, grouped
+ * tag filters, and reduced-motion support in app.css.
  */
 
 const TABS = [
@@ -126,12 +134,12 @@ function App() {
   return (
     <div className="kv-shell">
       <header className="kv-topbar">
-        <div className="kv-brand">
+        <h1 className="kv-brand">
           <span className="kv-brand-mark">
             <IconBookOpen size={20} />
           </span>
           KnowledgeVault
-        </div>
+        </h1>
         <div className="kv-top-right">
           <span className="kv-archive">Personal archive</span>
           <span
