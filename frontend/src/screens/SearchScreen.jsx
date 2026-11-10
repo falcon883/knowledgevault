@@ -1,7 +1,15 @@
 import { useMemo, useState } from 'react';
 import { getDocument, searchDocuments } from '../api.js';
 import { excerptOf } from '../excerpt.js';
-import { IconAlertCircle, IconFile, IconFileText, IconSearch } from '../icons.jsx';
+import {
+  IconAlertCircle,
+  IconArrowRight,
+  IconFile,
+  IconFileText,
+  IconFolder,
+  IconSearch,
+} from '../icons.jsx';
+import searchArt from '../assets/search-art.webp';
 
 /**
  * KV-18 — Search screen, wired to the semantic search endpoint (POST /search).
@@ -23,6 +31,20 @@ import { IconAlertCircle, IconFile, IconFileText, IconSearch } from '../icons.js
 
 const SNIPPET_MAX = 280;
 
+// Nov 2026 theme — example queries and Browse shortcuts for the idle
+// state. The category cards are real navigation, not decoration: each
+// opens Browse with its type filter applied (see App's browseType).
+// Browse distinguishes only PDF vs Text (kindOf in BrowseScreen), so
+// notes and articles share one card rather than pretending they can
+// be filtered apart.
+const EXAMPLE_QUERIES = ['Project requirements', 'AI model notes', 'Cloud architecture'];
+
+const CATEGORIES = [
+  { type: 'all', title: 'All documents', sub: 'Everything in your vault', Icon: IconFolder, cls: 'all' },
+  { type: 'PDF', title: 'PDFs', sub: 'Uploaded PDF files', Icon: IconFile, cls: 'pdf' },
+  { type: 'Text', title: 'Notes & articles', sub: 'Saved text of both kinds', Icon: IconFileText, cls: 'text' },
+];
+
 function parseTags(doc) {
   return (doc.tags || '')
     .split(',')
@@ -42,7 +64,7 @@ function formatSnippet(snippet) {
   return `${clean.slice(0, cut > 0 ? cut : SNIPPET_MAX).trimEnd()}…`;
 }
 
-export default function SearchScreen() {
+export default function SearchScreen({ onBrowseType } = {}) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [state, setState] = useState('idle'); // idle | searching | ready | error
@@ -59,10 +81,11 @@ export default function SearchScreen() {
     [results],
   );
 
-  async function runSearch(e) {
+  async function runSearch(e, override) {
     e?.preventDefault();
-    const q = query.trim();
+    const q = (override ?? query).trim();
     if (!q || state === 'searching') return;
+    if (override != null) setQuery(override);
     setState('searching');
     setError('');
     setSelectedId(null);
@@ -104,21 +127,29 @@ export default function SearchScreen() {
   }
 
   return (
-    <section className="kv-card" aria-labelledby="search-heading">
-      <h2 id="search-heading">Search your knowledge</h2>
-      <p className="kv-lede">
-        Describe what you want to find in plain language — results are ranked
-        by meaning, not keywords.
-      </p>
+    <section className="kv-card kv-search2" aria-labelledby="search-heading">
+      <div className="kv-search2-head">
+        <div>
+          <h2 id="search-heading">Search your knowledge</h2>
+          <p className="kv-lede">
+            Describe what you want to find in plain language — results are ranked
+            by meaning, not keywords.
+          </p>
+        </div>
+        <img className="kv-search2-art" src={searchArt} alt="" aria-hidden="true" />
+      </div>
 
       <form onSubmit={runSearch}>
         <label className="kv-label" htmlFor="kv-query">
           Describe what you want to find
         </label>
-        <div className="kv-search-row">
+        <div className="kv-search2-bar">
+          <span className="kv-search2-bar-icon">
+            <IconSearch size={19} />
+          </span>
           <input
             id="kv-query"
-            className="kv-input"
+            className="kv-input kv-search2-input"
             type="text"
             placeholder="e.g. how do I find documents by meaning?"
             value={query}
@@ -127,7 +158,7 @@ export default function SearchScreen() {
           />
           <button
             type="submit"
-            className="kv-btn"
+            className="kv-btn kv-search2-btn"
             disabled={!query.trim() || state === 'searching'}
           >
             {state === 'searching' ? (
@@ -137,24 +168,68 @@ export default function SearchScreen() {
               </>
             ) : (
               <>
-                <IconSearch size={16} />
                 Search
+                <IconArrowRight size={16} />
               </>
             )}
           </button>
         </div>
       </form>
 
+      <div className="kv-search2-try">
+        <span className="kv-search2-try-label" id="kv-try-label">
+          Try searching for:
+        </span>
+        <div className="kv-search2-chips" role="group" aria-labelledby="kv-try-label">
+          {EXAMPLE_QUERIES.map((q) => (
+            <button
+              key={q}
+              type="button"
+              className="kv-search2-chip"
+              disabled={state === 'searching'}
+              onClick={() => runSearch(null, q)}
+            >
+              <IconSearch size={14} />
+              {q}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div aria-live="polite" style={{ marginTop: '1.25rem' }}>
-        {state === 'idle' && (
-          <div className="kv-empty">
-            <span className="kv-empty-icon">
-              <IconSearch size={34} />
-            </span>
-            <br />
-            Enter a query to search your vault.
-          </div>
-        )}
+        {state === 'idle' &&
+          (onBrowseType ? (
+            <div className="kv-search2-cats">
+              {CATEGORIES.map((c) => {
+                const CatIcon = c.Icon;
+                return (
+                  <button
+                    key={c.type}
+                    type="button"
+                    className="kv-search2-cat"
+                    onClick={() => onBrowseType(c.type)}
+                  >
+                    <span className={`kv-search2-cat-icon ${c.cls}`}>
+                      <CatIcon size={22} />
+                    </span>
+                    <span className="kv-search2-cat-text">
+                      <strong>{c.title}</strong>
+                      <span>{c.sub}</span>
+                    </span>
+                    <IconArrowRight size={16} />
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="kv-empty">
+              <span className="kv-empty-icon">
+                <IconSearch size={34} />
+              </span>
+              <br />
+              Enter a query to search your vault.
+            </div>
+          ))}
 
         {state === 'error' && (
           <div className="kv-status error" role="alert">

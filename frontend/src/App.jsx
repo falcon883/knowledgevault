@@ -11,9 +11,11 @@ import './app.css';
 /**
  * KnowledgeVault app shell.
  *
- * Wireframe layout (slim top bar over a left sidebar nav) in the app's
- * white-and-blue theme: brand left in the top bar, archive label and
- * backend status right; the three screens stack as sidebar buttons.
+ * Layout (Nov 2026 theme): a dark navy top bar — brand left, archive
+ * label, backend status and sign out right — over a horizontal pill tab
+ * bar; the three screens render as white cards on a light page. On
+ * narrow screens the same structure stacks, matching the phone
+ * mockups.
  *
  *  - KV-19 Capture (upload wired to POST /upload)
  *  - KV-17 Browse (document list wired to GET /documents)
@@ -73,6 +75,10 @@ function App() {
   // Bumped every time Browse is navigated to from the upload flow, so its
   // list refreshes even though the screen no longer remounts on tab switch.
   const [browseRefresh, setBrowseRefresh] = useState(0);
+  // Set by the Search screen's category cards: Browse opens with this
+  // type filter already applied. The nonce makes a repeat pick of the
+  // same card re-apply the filter.
+  const [browseTypeSeed, setBrowseTypeSeed] = useState(null);
 
   // api.js calls this when a protected route answers 401.
   useEffect(() => {
@@ -126,6 +132,11 @@ function App() {
     selectTab(next);
   }
 
+  function browseType(type) {
+    setBrowseTypeSeed({ type, n: Date.now() });
+    navigate('browse');
+  }
+
   function signOut() {
     clearToken();
     setSignedIn(false);
@@ -133,6 +144,10 @@ function App() {
 
   return (
     <div className="kv-shell">
+      {/* Signed out, the auth screen renders full-bleed with its own hero
+          header (brand + backend status), so the top bar only appears
+          once signed in. */}
+      {signedIn && (
       <header className="kv-topbar">
         <h1 className="kv-brand">
           <span className="kv-brand-mark">
@@ -164,6 +179,7 @@ function App() {
           )}
         </div>
       </header>
+      )}
 
       {signedIn ? (
         <div className="kv-body">
@@ -199,6 +215,8 @@ function App() {
                   <Screen
                     onNavigate={navigate}
                     refreshSignal={t.id === 'browse' ? browseRefresh : undefined}
+                    typeSeed={t.id === 'browse' ? browseTypeSeed : undefined}
+                    onBrowseType={t.id === 'search' ? browseType : undefined}
                   />
                 </div>
               );
@@ -206,9 +224,7 @@ function App() {
           </main>
         </div>
       ) : (
-        <main className="kv-main kv-main-auth">
-          <AuthScreen onAuthenticated={() => setSignedIn(true)} />
-        </main>
+        <AuthScreen onAuthenticated={() => setSignedIn(true)} />
       )}
     </div>
   );

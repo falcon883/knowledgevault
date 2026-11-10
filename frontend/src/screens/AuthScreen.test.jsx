@@ -10,13 +10,16 @@ function toggleButton(name) {
   return within(group).getByRole('button', { name });
 }
 
+// The form also holds the show/hide password button, so pick the submit
+// by its label rather than by position.
 function submitButton() {
-  return within(document.querySelector('form')).getByRole('button');
+  return within(document.querySelector('form')).getByRole('button', { name: /sign/i });
 }
 
 // KV-39 — the auth screen is the gate for the whole app (KV-43): mode
 // switching, the client-side checks, and storing the issued token.
 vi.mock('../api.js', () => ({
+  checkHealth: vi.fn(async () => true),
   login: vi.fn(),
   signup: vi.fn(),
 }));
