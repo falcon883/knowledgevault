@@ -61,7 +61,7 @@ function formatDate(iso) {
  * (moved to src/excerpt.js so Search can reuse it)
  */
 
-export default function BrowseScreen({ refreshSignal = 0 } = {}) {
+export default function BrowseScreen({ refreshSignal = 0, typeSeed = null } = {}) {
   const [docs, setDocs] = useState([]);
   const [state, setState] = useState('loading'); // loading | ready | error
   const [error, setError] = useState('');
@@ -96,6 +96,12 @@ export default function BrowseScreen({ refreshSignal = 0 } = {}) {
     // Browse is navigated to from the upload flow (the screen no longer
     // remounts on tab switch).
   }, [refreshSignal]);
+
+  // The Search screen's category cards seed the type filter so a card
+  // lands here with its filter already applied.
+  useEffect(() => {
+    if (typeSeed) setTypeFilter(typeSeed.type);
+  }, [typeSeed]);
 
   const allTags = useMemo(() => {
     const set = new Set();
@@ -194,7 +200,7 @@ export default function BrowseScreen({ refreshSignal = 0 } = {}) {
   }
 
   return (
-    <section className="kv-card" aria-labelledby="browse-heading">
+    <section className="kv-card kv-browse2" aria-labelledby="browse-heading">
       <h2 id="browse-heading">Your documents</h2>
       <p className="kv-lede">
         {state === 'ready'

@@ -10,8 +10,12 @@ import {
   IconFolder,
   IconPen,
   IconPlus,
+  IconSave,
+  IconSearch,
+  IconTag,
   IconUploadCloud,
 } from '../icons.jsx';
+import folderArt from '../assets/folder-art.webp';
 
 /**
  * KV-19 — Capture / upload screen.
@@ -23,6 +27,12 @@ import {
  * The backend accepts application/pdf and text/plain only, so notes and
  * article text are uploaded as .txt files; the title field becomes the
  * filename since the API has no separate title field.
+ *
+ * Nov 2026 theme — on desktop the card splits into two columns: the
+ * form on the left and a rail on the right carrying the folder
+ * illustration and the three things the backend does after a save
+ * (auto-tagging, summary, semantic indexing). The rail stacks below
+ * the form on narrow screens.
  */
 
 const KINDS = ['PDF', 'Note', 'Article'];
@@ -325,13 +335,15 @@ export default function UploadScreen({ onNavigate } = {}) {
     .filter(Boolean);
 
   return (
-    <section className="kv-card" aria-labelledby="capture-heading">
+    <section className="kv-card kv-capture2" aria-labelledby="capture-heading">
       <h2 id="capture-heading">Add to your vault</h2>
       <p className="kv-lede">
         Save a PDF, a note, or article text. It will be extracted, indexed for
         semantic search, and automatically tagged with a summary.
       </p>
 
+      <div className="kv-capture2-grid">
+        <div className="kv-capture2-main">
       <div className="kv-kind-toggle" role="group" aria-label="Document kind">
         {KINDS.map((k) => {
           const KindIcon = KIND_ICONS[k];
@@ -482,11 +494,9 @@ export default function UploadScreen({ onNavigate } = {}) {
         </>
       )}
 
-      <p className="kv-meta">Tags and a summary appear after processing.</p>
-
       <button
         type="button"
-        className="kv-btn"
+        className="kv-btn kv-capture2-save"
         disabled={!canSave}
         onClick={handleSave}
       >
@@ -496,7 +506,10 @@ export default function UploadScreen({ onNavigate } = {}) {
             Uploading…
           </>
         ) : (
-          'Save to vault'
+          <>
+            <IconSave size={17} />
+            Save to vault
+          </>
         )}
       </button>
 
@@ -592,6 +605,52 @@ export default function UploadScreen({ onNavigate } = {}) {
             </div>
           </div>
         )}
+      </div>
+        </div>
+
+        <aside className="kv-capture2-rail" aria-label="What happens after saving">
+          <img className="kv-capture2-art" src={folderArt} alt="" aria-hidden="true" />
+          <h3 className="kv-capture2-rail-title">After saving</h3>
+          <ul className="kv-capture2-steps">
+            <li>
+              <span className="kv-capture2-chip">
+                <IconTag size={17} />
+              </span>
+              <span className="kv-capture2-step-text">
+                <strong>Auto-tagging</strong>
+                <span>Relevant tags are added automatically.</span>
+              </span>
+              <span className="kv-capture2-check">
+                <IconCheckCircle size={18} />
+              </span>
+            </li>
+            <li>
+              <span className="kv-capture2-chip">
+                <IconFileText size={17} />
+              </span>
+              <span className="kv-capture2-step-text">
+                <strong>Smart summary</strong>
+                <span>Key points extracted for quick reading.</span>
+              </span>
+              <span className="kv-capture2-check">
+                <IconCheckCircle size={18} />
+              </span>
+            </li>
+            <li>
+              <span className="kv-capture2-chip">
+                <IconSearch size={17} />
+              </span>
+              <span className="kv-capture2-step-text">
+                <strong>Semantic search</strong>
+                <span>Find it later with natural language.</span>
+              </span>
+              <span className="kv-capture2-check">
+                <IconCheckCircle size={18} />
+              </span>
+            </li>
+          </ul>
+          <p className="kv-meta">Tags and a summary appear after processing.</p>
+        </aside>
       </div>
     </section>
   );

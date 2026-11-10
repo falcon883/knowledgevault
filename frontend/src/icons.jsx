@@ -165,3 +165,80 @@ export function IconClock(props) {
     </Svg>
   );
 }
+
+export function IconMail(props) {
+  return (
+    <Svg {...props}>
+      <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
+      <path d="M3.5 7l8.5 6 8.5-6" />
+    </Svg>
+  );
+}
+
+export function IconLock(props) {
+  return (
+    <Svg {...props}>
+      <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+      <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+      <path d="M12 15h.01" />
+    </Svg>
+  );
+}
+
+export function IconEye(props) {
+  return (
+    <Svg {...props}>
+      <path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </Svg>
+  );
+}
+
+export function IconEyeOff(props) {
+  return (
+    <Svg {...props}>
+      <path d="M4 4l16 16" />
+      <path d="M9.9 5.9A9.4 9.4 0 0 1 12 5c6 0 9.5 7 9.5 7a17.6 17.6 0 0 1-3.3 3.9M6 8A16.9 16.9 0 0 0 2.5 12S6 19 12 19c1.2 0 2.3-.3 3.3-.7" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    </Svg>
+  );
+}
+
+export function IconLayers(props) {
+  return (
+    <Svg {...props}>
+      <path d="M12 3l9.5 5L12 13 2.5 8z" />
+      <path d="M2.5 12.5L12 17.5l9.5-5" />
+      <path d="M2.5 17L12 22l9.5-5" />
+    </Svg>
+  );
+}
+
+export function IconShieldCheck(props) {
+  return (
+    <Svg {...props}>
+      <path d="M12 3l7.5 3v5.5c0 4.6-3.2 7.9-7.5 9.5-4.3-1.6-7.5-4.9-7.5-9.5V6z" />
+      <path d="M9 11.8l2.2 2.2 4-4.3" />
+    </Svg>
+  );
+}
+
+export function IconSave(props) {
+  const { size = 24, ...rest } = props || {};
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" {...rest}>
+      <path d="M5 4.5h10.5L20 9v10.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-14a1 1 0 0 1 1-1Z" />
+      <path d="M8.5 4.5V9h7V4.5" />
+      <rect x="8.5" y="13.5" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+
+export function IconArrowRight(props) {
+  return (
+    <Svg {...props}>
+      <path d="M4 12h16" />
+      <path d="M14 6l6 6-6 6" />
+    </Svg>
+  );
+}
