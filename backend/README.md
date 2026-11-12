@@ -601,4 +601,13 @@ first (ties A to Z). "Recipes" and "recipes" count as one tag.
 
 ## Next steps
 
-- Possible later improvement: swap the extractive summary for an LLM-written one if the team decides the API dependency is worth it
+From the pilot session (KV-28) and the Sprint 4 work:
+
+- **Search quality (KV-47, KV-48):** one volunteer could not find a document
+  with their own wording, and the right result was first for only 2 of 6.
+  Candidates: hybrid keyword and meaning matching, re-ranking by the best
+  passage, and returning the matching passage with each result.
+- **Password reset:** not built. It needs email sending (for example AWS SES) and
+  reset-token endpoints.
+- **Login attempts are not rate limited.** Worth adding before real users.
+- Possible later improvement: swap the extractive summary for an LLM-written one if the team decides the API dependency is worth it.

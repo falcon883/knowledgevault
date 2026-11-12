@@ -16,14 +16,19 @@ at Clark University, Fall 2026.
   split into chunks and embedded locally, and the document gets automatic
   tags and a short summary. Bad files are rejected with a clear message, and
   a file that was already uploaded is flagged as a duplicate.
-- **Browse:** list your documents and delete the ones you no longer want.
-  The API can already filter by tag and date and return a full-text preview;
-  the screen picks these up in Sprint 3.
+- **Browse:** list your documents, filter them by type or tag, sort them, read
+  a preview of the text, and delete the ones you no longer want.
 - **Search:** ask in plain language ("how old is the universe") and get the
   best-matching documents back, ranked by meaning.
+- **Accounts:** sign up and sign in. Each person sees only their own documents.
 
-Everything runs on your own machine: FastAPI, Postgres with pgvector, and a
-local sentence-transformers model, so there are no API keys or per-call costs.
+Everything runs on your own machine or on one small server: FastAPI, Postgres
+with pgvector, and a local sentence-transformers model, so there are no API
+keys or per-call costs.
+
+**Live demo** (Sprint 4 deployment): the app is at
+https://d33bsamq53gtgw.cloudfront.net and the API, with its interactive docs,
+at https://3-13-43-176.sslip.io/docs.
 
 ## Repository structure
 
@@ -32,7 +37,7 @@ local sentence-transformers model, so there are no API keys or per-call costs.
 | [`/backend`](./backend) | FastAPI service, database models, embedding and search code, and the pytest suite. See its [README](./backend/README.md) for details. |
 | [`/frontend`](./frontend) | React app built with Vite: Search, Browse and Capture screens. |
 | [`/e2e`](./e2e) | End-to-end browser tests (Playwright): sign up, add, browse, search, delete, through the real screens. See its [README](./e2e/README.md). |
-| [`/docs`](./docs) | Project Charter, Vision/Roadmap/Release Plan, sprint feedback. |
+| [`/docs`](./docs) | Project Charter, Vision/Roadmap/Release Plan, architecture, sprint feedback. |
 | [`docker-compose.yml`](./docker-compose.yml) | Starts Postgres with pgvector and the backend with one command (see Getting started). |
 | [`/deploy`](./deploy) | AWS deployment: step-by-step guide, HTTPS config and an end-to-end check script. Used with [`docker-compose.prod.yml`](./docker-compose.prod.yml). |
 | [`/.github/workflows`](./.github/workflows) | CI: runs the backend, frontend and end-to-end tests and builds and checks the Docker stack, on every push and pull request. |
@@ -120,9 +125,12 @@ Request and response details are in the [backend README](./backend/README.md#end
 
 ## Status
 
-Release 2 (Sprint 3 of the roadmap) is in progress: upload validation,
-duplicate detection, browse filters and previews, and automated tests and CI
-are done. Sprint 4 is under way: settings from environment variables,
-Docker, the AWS deployment and user accounts are in, and the sign-in screens,
-the pilot session and end-to-end tests are next. See the roadmap in
+Release 2 (Pilot Beta) is done: upload validation, duplicate detection,
+browse filters and previews, automated tests and CI, and a pilot session with
+six volunteers, five of whom (83%) added a document and found it again without
+help, against a target of 80%. Sprint 4 added the Docker setup, the AWS
+deployment, user accounts and sign-in screens, URL routing, accessibility
+fixes, the architecture document ([`docs/architecture.md`](./docs/architecture.md))
+and end-to-end tests. The pilot findings, mainly search ranking for natural
+phrasing, are the first items in the next backlog. See the roadmap in
 [`/docs`](./docs) for the full plan.
