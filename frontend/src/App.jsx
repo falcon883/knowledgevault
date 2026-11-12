@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { checkHealth } from './api.js';
 import { getToken, clearToken, setUnauthorizedHandler } from './auth.js';
 import AuthScreen from './screens/AuthScreen.jsx';
@@ -30,6 +30,11 @@ import './app.css';
  * /health, so the shell gates on sign-in: with no stored token the auth
  * screen replaces the workspace, and any 401 from the API (expired or
  * invalid token) clears the token and returns the user to sign-in.
+ *
+ * KV-32 — the end-to-end tests found that opening Browse from the sidebar
+ * showed a stale list (only the "View in Browse" button refreshed it), so
+ * Browse now re-fetches every time it becomes the active tab, however the
+ * user got there (sidebar, button, Back/Forward or a link).
  *
  * KV-40 — the active tab is mirrored in the URL hash (#/capture,
  * #/browse, #/search), so a refresh keeps the tab and the browser's
@@ -96,6 +101,17 @@ function App() {
     };
   }, [tab, signedIn]);
 
+  // KV-32 — Browse stays mounted while hidden, so it would keep showing the
+  // list it loaded earlier. Ask it to reload whenever it becomes the active
+  // tab (not on first load: it fetches for itself when it mounts).
+  const previousTab = useRef(tab);
+  useEffect(() => {
+    if (tab === 'browse' && previousTab.current !== 'browse') {
+      setBrowseRefresh((n) => n + 1);
+    }
+    previousTab.current = tab;
+  }, [tab]);
+
   // KV-40 — on first load, normalise the URL to the active tab's hash.
   // replaceState, not a hash assignment, so the landing URL is rewritten
   // in place instead of gaining a duplicate history entry.
@@ -128,7 +144,6 @@ function App() {
   }
 
   function navigate(next) {
-    if (next === 'browse') setBrowseRefresh((n) => n + 1);
     selectTab(next);
   }
 

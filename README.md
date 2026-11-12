@@ -31,10 +31,11 @@ local sentence-transformers model, so there are no API keys or per-call costs.
 |---|---|
 | [`/backend`](./backend) | FastAPI service, database models, embedding and search code, and the pytest suite. See its [README](./backend/README.md) for details. |
 | [`/frontend`](./frontend) | React app built with Vite: Search, Browse and Capture screens. |
+| [`/e2e`](./e2e) | End-to-end browser tests (Playwright): sign up, add, browse, search, delete, through the real screens. See its [README](./e2e/README.md). |
 | [`/docs`](./docs) | Project Charter, Vision/Roadmap/Release Plan, sprint feedback. |
 | [`docker-compose.yml`](./docker-compose.yml) | Starts Postgres with pgvector and the backend with one command (see Getting started). |
 | [`/deploy`](./deploy) | AWS deployment: step-by-step guide, HTTPS config and an end-to-end check script. Used with [`docker-compose.prod.yml`](./docker-compose.prod.yml). |
-| [`/.github/workflows`](./.github/workflows) | CI: runs the backend tests, builds the Docker stack and checks it, on every push and pull request. |
+| [`/.github/workflows`](./.github/workflows) | CI: runs the backend, frontend and end-to-end tests and builds and checks the Docker stack, on every push and pull request. |
 
 ## Getting started
 
@@ -75,6 +76,14 @@ pip install -r requirements-dev.txt
 DATABASE_URL=postgresql+psycopg2://knowledgevault:knowledgevault@localhost:5433/knowledgevault pytest
 ```
 More on running the tests is in the [backend README](./backend/README.md#running-the-tests).
+
+**End-to-end tests** (a real browser against the real screens and API; same database as above, set in `DATABASE_URL` or `backend/.env`)
+```bash
+cd e2e
+npm install && npm run setup   # once
+npm test
+```
+Details, and what each test covers, are in the [e2e README](./e2e/README.md).
 
 ## Deployment
 

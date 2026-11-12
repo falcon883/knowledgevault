@@ -1,0 +1,83 @@
+# KV-32 - end-to-end tests: a real browser drives the real frontend against the
+# real API and a throwaway Postgres. See e2e/README.md.
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # The same pgvector image the backend tests use. The tests work in their own
+    # schema inside it, so nothing else needs setting up.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: knowledgevault
+          POSTGRES_PASSWORD: knowledgevault
+          POSTGRES_DB: knowledgevault
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U knowledgevault"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      E2E_DATABASE_URL: postgresql+psycopg2://knowledgevault:knowledgevault@localhost:5432/knowledgevault
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      # The tests use a stand-in for the embedding model, so the model library
+      # (and PyTorch, which is most of the download) is not needed here.
+      - name: Install the backend
+        run: |
+          grep -vi '^sentence-transformers' backend/requirements.txt > /tmp/requirements-e2e.txt
+          pip install -r /tmp/requirements-e2e.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            e2e/package-lock.json
+
+      - name: Install the frontend and the test runner
+        run: |
+          npm ci --prefix frontend
+          npm ci --prefix e2e
+
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+        working-directory: e2e
+
+      - name: Run the end-to-end tests
+        run: npm test
+        working-directory: e2e
+
+      - name: Keep the report if something failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
