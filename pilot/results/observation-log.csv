@@ -1,0 +1,7 @@
+volunteer,document,task1,task2,minutes_task1,minutes_task2,timed_out,query_typed,result_rank,overall,ease_adding_1to5,ease_finding_1to5,would_use,problems_seen
+P1,T1,Pass,Pass,2:18,1:42,no,How do I turn kitchen scraps and yard waste into compost at home?,1,Pass,5,5,Yes,None observed.
+P2,T2,Pass,Pass,3:06,2:34,no,Explain how vaccines teach the body to recognize germs and build protection.,2,Pass,4,4,Maybe,Search result was not the first item; participant opened the second result after comparing titles.
+P3,T3,Pass,Pass,1:56,2:05,no,Beginner-friendly guide to investing in a fund that tracks a market index.,1,Pass,5,5,Yes,None observed.
+P4,T4,Pass,Fail,2:42,4:00,yes,A gradual weekly running plan for someone preparing for their first 26.2-mile race.,No relevant result in top 5,Fail,4,2,Maybe,Search did not surface the target within the 4-minute task limit; participant tried two phrasings and stopped at timeout.
+P5,T5,Pass,Pass,2:51,3:12,no,What makes sourdough bread dough expand and form bubbles during fermentation?,3,Pass,4,3,Yes,Participant initially searched for 'bread bubbles'; refined query to mention sourdough fermentation and selected third result.
+P6,T6,Pass,Pass,2:09,2:48,no,How does getting enough sleep help the brain store and remember information?,2,Pass,5,4,Yes,Participant scanned the first two results before opening the matching document.

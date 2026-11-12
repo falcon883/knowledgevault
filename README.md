@@ -128,9 +128,9 @@ Request and response details are in the [backend README](./backend/README.md#end
 Release 2 (Pilot Beta) is done: upload validation, duplicate detection,
 browse filters and previews, automated tests and CI, and a pilot session with
 six volunteers, five of whom (83%) added a document and found it again without
-help, against a target of 80%. Sprint 4 added the Docker setup, the AWS
-deployment, user accounts and sign-in screens, URL routing, accessibility
-fixes, the architecture document ([`docs/architecture.md`](./docs/architecture.md))
+help, against a target of 80% (results in [`pilot/results`](./pilot/results)).
+Sprint 4 added the Docker setup, the AWS deployment, user accounts and sign-in
+screens, URL routing, accessibility fixes, the architecture document ([`docs/architecture.md`](./docs/architecture.md))
 and end-to-end tests. The pilot findings, mainly search ranking for natural
 phrasing, are the first items in the next backlog. See the roadmap in
 [`/docs`](./docs) for the full plan.

@@ -9,6 +9,7 @@ this folder holds the sample documents and the script that prepares the app.
 | `sample_docs/targets/` | 8 one-page PDFs, one per volunteer (T1 to T8). Copy them into a folder called `Pilot` on the Desktop. |
 | `sample_docs/background/` | 10 PDFs on other topics, loaded into the library so search has something to rank against. |
 | `seed_library.py` | Loads the background documents, and checks that every target can be found. |
+| `results/` | The pilot results: summary, feedback forms, observation log and facilitator pack. |
 
 ## Before the sessions
 
