@@ -1,6 +1,7 @@
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import App from './App.jsx';
 import { setToken } from './auth.js';
+import { listDocuments } from './api.js';
 
 // KV-39 — shell behaviour: the KV-43 sign-in gate and the KV-40 hash
 // routing (tab survives refresh, hash picks the tab, sign-out returns
@@ -63,5 +64,20 @@ describe('App shell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument();
+  });
+
+  it('re-loads the document list each time Browse is opened (KV-32)', async () => {
+    // Found by the end-to-end tests: Browse used to show the list it loaded
+    // before an upload until the page was refreshed.
+    setToken('tok');
+    render(<App />);
+    await waitFor(() => expect(listDocuments).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(navButton('Browse'));
+    await waitFor(() => expect(listDocuments).toHaveBeenCalledTimes(2));
+
+    fireEvent.click(navButton('Search'));
+    fireEvent.click(navButton('Browse'));
+    await waitFor(() => expect(listDocuments).toHaveBeenCalledTimes(3));
   });
 });

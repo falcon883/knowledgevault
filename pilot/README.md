@@ -12,11 +12,13 @@ this folder holds the sample documents and the script that prepares the app.
 
 ## Before the sessions
 
-With the backend running (`python main.py` in `backend/`):
+The sessions use the live site (the API on AWS, the app on CloudFront). Add
+`--url https://3-13-43-176.sslip.io` to point the script at the AWS API; without
+it the script uses a backend on your own machine (`python main.py` in `backend/`).
 
 ```bash
-python pilot/seed_library.py --password <pilot password>            # load the 10 background documents
-python pilot/seed_library.py --password <pilot password> --check    # dry run for the 8 target documents
+python pilot/seed_library.py --url https://3-13-43-176.sslip.io --password <pilot password>            # load the 10 background documents
+python pilot/seed_library.py --url https://3-13-43-176.sslip.io --password <pilot password> --check    # dry run for the 8 target documents
 ```
 
 Documents belong to an account (KV-42). The script signs in as the pilot account

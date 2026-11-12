@@ -1,0 +1,17 @@
+{
+  "name": "knowledgevault-e2e",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "End-to-end browser tests for KnowledgeVault (KV-32)",
+  "scripts": {
+    "setup": "npm --prefix ../frontend ci && playwright install chromium",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.0"
+  }
+}
