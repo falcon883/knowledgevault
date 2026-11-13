@@ -27,10 +27,13 @@ Documents belong to an account (KV-42). The script signs in as the pilot account
 choose a password for it and have the volunteers sign in with that account.
 You can also set `PILOT_EMAIL` and `PILOT_PASSWORD` instead of the flags.
 
-`--check` uploads each target, runs two plain-language searches for it, prints
-where it ranked, and deletes the targets again. A target passes if it is in the
-top 3 for both searches. Run it with the real model, since the stand-in
-embedder used in some tests ranks differently.
+`--check` uploads each target, runs the plain-language searches for it (two
+prepared ones, plus a volunteer's own wording for T4 from the pilot, KV-47),
+prints where it ranked, and deletes the targets again. A target passes if it is
+in the top 3 for every search. Add `--verbose` to see the five best results and
+their scores for each search, and, when the target is missing, whether it was
+outranked or scored below the minimum. Run it with the real model, since the
+stand-in embedder used in some tests ranks differently.
 
 ## Between volunteers
 

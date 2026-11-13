@@ -12,11 +12,16 @@ the account the first time. Give it with --email and --password (or the
 PILOT_EMAIL and PILOT_PASSWORD environment variables); the volunteers sign in
 with the same account to see the library this script loads.
 
---check uploads each of the 8 target documents, runs two plain-language
-searches for each (worded differently from the document), reports where the
-target came out in the results, and then deletes the targets it uploaded. A
-target passes if it is in the top 3 for both searches. If one fails, adjust
-the wording of that document rather than the searches.
+--check uploads each of the 8 target documents, runs the plain-language
+searches listed below for each (worded differently from the document),
+reports where the target came out in the results, and then deletes the
+targets it uploaded. A target passes if it is in the top 3 for every search.
+Most searches were written with the document in mind; the last one for T4 is a
+volunteer's own wording from the pilot (KV-47), so a document that only
+passes the prepared searches does not count as findable.
+
+Add --verbose to see, for every search, the five best results with their
+scores, so you can tell what is outranking the target.
 """
 
 import argparse
@@ -33,7 +38,12 @@ QUERIES = {
     "T1_composting_at_home": ["what can I do with leftover vegetable scraps in the garden", "how to turn food waste into soil"],
     "T2_how_vaccines_work": ["how does getting a shot protect me from disease", "why do booster shots work"],
     "T3_index_funds_for_beginners": ["low cost way to invest in the whole stock market", "what is an index fund"],
-    "T4_first_marathon_training": ["how should I prepare to run 26 miles", "beginner running plan for a long race"],
+    "T4_first_marathon_training": [
+        "how should I prepare to run 26 miles",
+        "beginner running plan for a long race",
+        # Typed by pilot volunteer P4, who did not find the document (KV-47).
+        "A gradual weekly running plan for someone preparing for their first 26.2-mile race.",
+    ],
     "T5_why_sourdough_rises": ["why does bread dough puff up", "what makes homemade bread with wild yeast taste tangy"],
     "T6_sleep_and_memory": ["does getting enough rest help me remember things", "what happens in the brain at night"],
     "T7_bike_commuting": ["tips for riding my bike to work", "how to stay safe cycling in traffic"],
@@ -76,19 +86,32 @@ def seed(client: httpx.Client) -> int:
     return 0
 
 
-def rank_of(client: httpx.Client, query: str, doc_id: int) -> int | None:
+def search(client: httpx.Client, query: str, **extra) -> list[dict]:
     # Same defaults the app uses, so the result matches what a volunteer sees.
-    r = client.post("/search", json={"query": query, "limit": 10})
+    r = client.post("/search", json={"query": query, "limit": 10, **extra})
     r.raise_for_status()
-    ids = [hit["document_id"] for hit in r.json()["results"]]
+    return r.json()["results"]
+
+
+def rank_of(results: list[dict], doc_id: int) -> int | None:
+    ids = [hit["document_id"] for hit in results]
     return ids.index(doc_id) + 1 if doc_id in ids else None
 
 
-def check(client: httpx.Client) -> int:
+def show_top(results: list[dict], doc_id: int, n: int = 5) -> None:
+    """Print the best results with their scores; mark the target with an arrow."""
+    if not results:
+        print("      (no results above the minimum score)")
+    for position, hit in enumerate(results[:n], start=1):
+        marker = "->" if hit["document_id"] == doc_id else "  "
+        print(f"    {marker} {position}. {hit['score']:.3f}  {hit['filename']}")
+
+
+def check(client: httpx.Client, verbose: bool = False) -> int:
     ours: list[int] = []  # documents this run uploaded, deleted again at the end
     failures = 0
     try:
-        print(f"{'target':32} {'search 1':>9} {'search 2':>9}   (position in results; top {TOP_N} passes)")
+        print(f"{'target':32} position in results per search (top {TOP_N} passes)")
         for path in sorted((DOCS / "targets").glob("*.pdf")):
             r = upload(client, path)
             if r.status_code == 200:
@@ -100,11 +123,26 @@ def check(client: httpx.Client) -> int:
                 print(f"FAILED upload {path.name}: {r.status_code} {r.text}")
                 return 1
 
-            ranks = [rank_of(client, q, doc_id) for q in QUERIES[path.stem]]
+            queries = QUERIES[path.stem]
+            found = [search(client, q) for q in queries]
+            ranks = [rank_of(results, doc_id) for results in found]
             ok = all(rank is not None and rank <= TOP_N for rank in ranks)
             failures += not ok
             shown = [str(rank) if rank else "not found" for rank in ranks]
-            print(f"{path.stem:32} {shown[0]:>9} {shown[1]:>9}   {'ok' if ok else 'FIX THIS ONE'}")
+            print(f"{path.stem:32} {'  '.join(f'{x:>9}' for x in shown)}   {'ok' if ok else 'FIX THIS ONE'}")
+            if verbose:
+                for query, results in zip(queries, found):
+                    print(f'    "{query}"')
+                    show_top(results, doc_id)
+                    if rank_of(results, doc_id) is None:
+                        # Missing from the normal results: is it below the minimum score, or outranked?
+                        everything = search(client, query, limit=20, min_score=0)
+                        position = rank_of(everything, doc_id)
+                        if position is None:
+                            print("    target is not in the top 20 even with no minimum score")
+                        else:
+                            score = everything[position - 1]["score"]
+                            print(f"    target is #{position} with the minimum score off, scoring {score:.3f}")
     finally:
         for doc_id in ours:
             client.delete(f"/documents/{doc_id}")
@@ -116,6 +154,7 @@ def check(client: httpx.Client) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--check", action="store_true", help="dry run: find each target document by search")
+    parser.add_argument("--verbose", action="store_true", help="with --check: show the top 5 results and scores for every search")
     parser.add_argument("--url", default="http://localhost:8000", help="backend address (default %(default)s)")
     parser.add_argument("--email", default=os.getenv("PILOT_EMAIL", "pilot@example.com"), help="pilot account (default %(default)s)")
     parser.add_argument("--password", default=os.getenv("PILOT_PASSWORD"), help="pilot account password (or set PILOT_PASSWORD)")
@@ -134,7 +173,7 @@ def main() -> int:
             print("Note: the embedding model is not loaded yet, so the first request will be slow.\n")
         if not sign_in(client, args.email, args.password):
             return 1
-        return check(client) if args.check else seed(client)
+        return check(client, args.verbose) if args.check else seed(client)
 
 
 if __name__ == "__main__":
