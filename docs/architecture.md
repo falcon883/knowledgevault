@@ -1,9 +1,9 @@
 # KnowledgeVault — Architecture
 
-_KV-45 deliverable. Frontend: Percival Tapera. Backend: Durvank Deorukhkar.
-This document describes the system as built at the end of Sprint 4
-(Nov 12, 2026); the deployment section describes both hosts as deployed
-on Nov 8._
+_KV-45 deliverable. Presentation tier: Percival Tapera. Application and data
+tiers: Durvank Deorukhkar. This document describes the system as built at
+the end of Sprint 4 (Nov 12, 2026); the deployment section describes the
+static hosting and the application server as deployed on Nov 8._
 
 ## Overview
 
@@ -16,47 +16,28 @@ best-matching snippet per document. Every document is owned by the
 account that uploaded it; one user can never see another's documents
 (the API returns 404, not 403, for someone else's document id).
 
+The system is a **three-tier architecture**:
+
+| Tier | What it does | Components | Where it runs |
+|---|---|---|---|
+| 1. Presentation | What the user sees and uses | React single-page application, with its built files served by static content hosting (CloudFront + S3) | The user's browser; hosting in Percival's AWS account |
+| 2. Application | Business logic: sign-in, ingestion, search | Caddy reverse proxy, FastAPI application, ingestion and search code, local embedding model | The application server: one EC2 instance under Docker Compose, in Durvank's AWS account |
+| 3. Data | Stores users, documents, chunks and embeddings | PostgreSQL with the pgvector extension | A container on the same EC2 instance, data in the `pgdata` volume |
+
+The presentation tier talks to the application tier only through the REST
+API over HTTPS, and only the application tier talks to the data tier.
+
 ## System diagram
 
-![KnowledgeVault system diagram](architecture-diagram.png)
+![KnowledgeVault three-tier architecture diagram](architecture-diagram.png)
 
-<details>
-<summary>Diagram source (Mermaid; GitHub also draws it when expanded)</summary>
+Diagram source: [`architecture-diagram.svg`](architecture-diagram.svg). The PNG above is exported from it.
 
-```mermaid
-flowchart TB
-    subgraph Browser["User's browser"]
-        SPA["React SPA (Vite build)<br/>App shell · hash routing (KV-40)<br/>Capture / Browse / Search screens"]
-        LS[("localStorage<br/>kv_access_token (24 h JWT)")]
-        SPA --- LS
-    end
-
-    subgraph FEHOST["Frontend host (Percival's AWS)"]
-        CF["CloudFront<br/>HTTPS"]
-        S3[("S3 bucket<br/>static Vite build")]
-        CF --> S3
-    end
-
-    subgraph AWS["Backend host (Durvank's AWS)"]
-        CADDY["Caddy container (one EC2 instance, Docker Compose)<br/>HTTPS certificate + reverse proxy<br/>only public ports: 80 and 443"]
-        API["FastAPI backend container<br/>/auth · /upload · /documents · /search · /health"]
-        CHUNK["Ingestion pipeline (in the backend)<br/>text extraction → sentence-aware chunking (KV-38)<br/>→ local embedding model, no external API<br/>→ tags and summary"]
-        DB[("PostgreSQL + pgvector container<br/>users · documents · chunks<br/>Alembic migrations run on start (KV-36)")]
-        CADDY --> API
-        API --> CHUNK
-        CHUNK --> DB
-        API --> DB
-    end
-
-    SPA -- "1. loads the app<br/>d33bsamq53gtgw.cloudfront.net" --> CF
-    SPA -- "2. API calls over HTTPS<br/>Authorization: Bearer token<br/>3-13-43-176.sslip.io" --> CADDY
-```
-
-</details>
+Request flow: (1) the browser loads the app files from CloudFront, which serves them from S3; (2) the app sends API requests over HTTPS with the user's Bearer token to the application server, where Caddy passes them to the FastAPI application; (3) the FastAPI application and its ingestion and search code read and write the database.
 
 ## Components
 
-### Frontend (React 18 + Vite, no router library)
+### Tier 1, presentation: React app (React 18 + Vite, no router library)
 
 | Piece | File | Responsibility |
 |---|---|---|
@@ -79,7 +60,7 @@ pull request.
 Accessibility: labelled controls, visible focus outlines, grouped
 filters, and reduced-motion support.
 
-### Backend (FastAPI — Durvank)
+### Tier 2, application: FastAPI application server (Durvank)
 
 - **Auth (KV-42):** signup and login issue a 24-hour JWT (HS256, signed
   with `SECRET_KEY`); passwords are bcrypt-hashed. Every route requires
@@ -100,11 +81,6 @@ filters, and reduced-motion support.
 - **Search:** the query is embedded and matched against the user's chunk
   vectors in pgvector; results are grouped to one best snippet per
   document.
-- **Data:** PostgreSQL 16 with the pgvector extension and three tables
-  (`users`, `documents`, `chunks`). The schema is managed by Alembic
-  migrations (KV-36), applied automatically when the backend starts and
-  safe on databases that already hold data. Deleting a document cascades
-  to its chunks and embeddings.
 - **Configuration and health (KV-37):** all settings come from
   environment variables (`DATABASE_URL`, `SECRET_KEY`, `CORS_ORIGINS`,
   `MAX_UPLOAD_MB`, ...) and the server refuses to start without the
@@ -118,6 +94,16 @@ filters, and reduced-motion support.
   for the `sslip.io` name automatically. `deploy/smoke_test.py` checks a
   running server end to end (sign up, upload, search, per-user
   isolation, delete).
+
+### Tier 3, data: PostgreSQL + pgvector
+
+PostgreSQL 16 with the pgvector extension and three tables (`users`,
+`documents`, `chunks`), running in its own container on the application
+server's EC2 instance with its data in the `pgdata` Docker volume. The
+schema is managed by Alembic migrations (KV-36), applied automatically
+when the application starts and safe on databases that already hold
+data. Deleting a document cascades to its chunks and embeddings. The
+database is not reachable from the internet: only Caddy publishes ports.
 
 ## Key flows
 
@@ -139,26 +125,28 @@ UI normalises scores against the top result for the relevance bar.
 
 ## Deployment
 
-Two hosts, kept in separate AWS accounts (each teammate's own) for the
+The tiers are deployed in two AWS accounts (each teammate's own) for the
 demo and deliverables:
 
-- **Backend:** one EC2 instance (t3.small, Ubuntu 24.04) with an Elastic
-  IP, running the three containers above under Docker Compose. Caddy
+- **Application server and data tier:** one EC2 instance (t3.small,
+  Ubuntu 24.04) with an Elastic IP, running the three containers above
+  (Caddy, the FastAPI application, PostgreSQL) under Docker Compose. Caddy
   serves HTTPS at `https://3-13-43-176.sslip.io` (sslip.io turns the
   server's IP into a hostname, so no domain is needed). Updating is
   `git pull` then `docker compose -f docker-compose.prod.yml up -d --build`;
   database migrations run on start. Setup steps are in `deploy/README.md`.
-- **Frontend:** the static Vite build in an S3 bucket behind CloudFront
-  at `https://d33bsamq53gtgw.cloudfront.net`, built with `VITE_API_URL`
-  set to the backend address. Hash routing (KV-40) was chosen because it
-  needs no history-API rewrites from a static host.
-- **CORS:** the backend only answers browsers whose origin is in its
+- **Static content hosting (presentation tier):** the static Vite build
+  in an S3 bucket behind CloudFront at
+  `https://d33bsamq53gtgw.cloudfront.net`, built with `VITE_API_URL` set
+  to the application server's address. Hash routing (KV-40) was chosen
+  because it needs no history-API rewrites from static hosting.
+- **CORS:** the application server only answers browsers whose origin is in its
   `CORS_ORIGINS` setting, which holds `http://localhost:5173` (local
   development) and the CloudFront address. A new frontend address must be
   added there, followed by `docker compose -f docker-compose.prod.yml up -d`
   on the server.
 - **Secrets:** `SECRET_KEY` and the database password live only in the
-  server's `.env`; nothing secret is committed or sent to the frontend.
+  server's `.env`; nothing secret is committed or sent to the browser.
 
 ## Repository layout
 

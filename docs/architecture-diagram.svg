@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1760" height="1240" viewBox="0 0 1760 1240" font-family="Helvetica, Arial, sans-serif">
+<defs><marker id="ah" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L12 6 L0 12 Z" fill="#1f2933"/></marker></defs>
+<rect width="1760" height="1240" fill="#ffffff"/>
+<text x="880.0" y="46" font-size="30" font-weight="700" text-anchor="middle" fill="#1f2933">KnowledgeVault: three-tier architecture</text>
+<rect x="40" y="80" width="1680" height="310" rx="14" fill="#eef4ff" stroke="#3b62b8" stroke-width="2.5"/>
+<text x="62" y="116" font-size="22" font-weight="700" fill="#3b62b8" letter-spacing="1">TIER 1 · PRESENTATION TIER</text>
+<text x="62" y="144" font-size="18" fill="#1f2933">What the user sees and uses</text>
+<rect x="80" y="165" width="760" height="205" rx="10" fill="#ffffff" fill-opacity="0.7" stroke="#3b62b8" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="98" y="193" font-size="18" font-weight="700" fill="#3b62b8">Web browser (the user's device)</text>
+<rect x="100" y="215" width="380" height="135" rx="10" fill="#ffffff" stroke="#3b62b8" stroke-width="2"/>
+<text x="290.0" y="261.5" font-size="19" font-weight="700" text-anchor="middle" fill="#1f2933">React single-page application</text>
+<text x="290.0" y="288.5" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">Capture · Browse · Search</text>
+<text x="290.0" y="315.5" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">hash routing</text>
+<rect x="520" y="215" width="300" height="135" rx="10" fill="#ffffff" stroke="#3b62b8" stroke-width="2"/>
+<text x="670.0" y="261.5" font-size="19" font-weight="700" text-anchor="middle" fill="#1f2933">localStorage</text>
+<text x="670.0" y="288.5" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">JWT access token</text>
+<text x="670.0" y="315.5" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">(24 h)</text>
+<path d="M 480 282 L 520 282" fill="none" stroke="#1f2933" stroke-width="2.5"/>
+<rect x="960" y="165" width="740" height="205" rx="10" fill="#ffffff" fill-opacity="0.7" stroke="#b86e0a" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="978" y="193" font-size="18" font-weight="700" fill="#b86e0a">Static content hosting (AWS account of Percival)</text>
+<rect x="980" y="215" width="330" height="135" rx="10" fill="#ffffff" stroke="#b86e0a" stroke-width="2"/>
+<text x="1145.0" y="261.5" font-size="19" font-weight="700" text-anchor="middle" fill="#1f2933">Amazon CloudFront</text>
+<text x="1145.0" y="288.5" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">content delivery network</text>
+<text x="1145.0" y="315.5" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">(CDN), HTTPS</text>
+<rect x="1350" y="215" width="330" height="135" rx="10" fill="#ffffff" stroke="#b86e0a" stroke-width="2"/>
+<text x="1515.0" y="261.5" font-size="19" font-weight="700" text-anchor="middle" fill="#1f2933">Amazon S3 bucket</text>
+<text x="1515.0" y="288.5" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">the built React files</text>
+<text x="1515.0" y="315.5" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">(HTML, CSS, JavaScript)</text>
+<path d="M 1310 282 L 1350 282" fill="none" stroke="#1f2933" stroke-width="2.5" marker-end="url(#ah)"/>
+<rect x="40" y="470" width="1680" height="320" rx="14" fill="#e8f6ec" stroke="#23814a" stroke-width="2.5"/>
+<text x="62" y="692" font-size="22" font-weight="700" fill="#23814a" letter-spacing="1">TIER 2 · APPLICATION TIER</text>
+<text x="62" y="724" font-size="18" fill="#1f2933">Application server: one EC2 instance</text>
+<text x="62" y="748" font-size="18" fill="#1f2933">running Docker Compose</text>
+<text x="62" y="772" font-size="18" fill="#1f2933">AWS account of Durvank</text>
+<rect x="100" y="510" width="320" height="150" rx="10" fill="#ffffff" stroke="#23814a" stroke-width="2"/>
+<text x="260.0" y="564.0" font-size="19" font-weight="700" text-anchor="middle" fill="#1f2933">Caddy reverse proxy</text>
+<text x="260.0" y="591.0" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">HTTPS (TLS) termination</text>
+<text x="260.0" y="618.0" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">public ports 80 and 443</text>
+<rect x="620" y="510" width="320" height="150" rx="10" fill="#ffffff" stroke="#23814a" stroke-width="2"/>
+<text x="780.0" y="550.5" font-size="19" font-weight="700" text-anchor="middle" fill="#1f2933">FastAPI application</text>
+<text x="780.0" y="577.5" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">REST API:</text>
+<text x="780.0" y="604.5" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">/auth  /upload  /documents</text>
+<text x="780.0" y="631.5" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">/search  /health</text>
+<rect x="1140" y="510" width="320" height="150" rx="10" fill="#ffffff" stroke="#23814a" stroke-width="2"/>
+<text x="1300.0" y="550.5" font-size="19" font-weight="700" text-anchor="middle" fill="#1f2933">Ingestion and search</text>
+<text x="1300.0" y="577.5" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">text extraction, chunking,</text>
+<text x="1300.0" y="604.5" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">local embedding model,</text>
+<text x="1300.0" y="631.5" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">tags and summary</text>
+<path d="M 420 585 L 620 585" fill="none" stroke="#1f2933" stroke-width="2.5" marker-end="url(#ah)"/>
+<path d="M 940 585 L 1140 585" fill="none" stroke="#1f2933" stroke-width="2.5" marker-end="url(#ah)"/>
+<rect x="40" y="860" width="1680" height="260" rx="14" fill="#f1ecfb" stroke="#6c47b8" stroke-width="2.5"/>
+<text x="62" y="896" font-size="22" font-weight="700" fill="#6c47b8" letter-spacing="1">TIER 3 · DATA TIER</text>
+<text x="62" y="924" font-size="18" fill="#1f2933">Database server: its own container on the same EC2 instance</text>
+<rect x="700" y="940" width="680" height="140" rx="10" fill="#ffffff" stroke="#6c47b8" stroke-width="2"/>
+<text x="1040.0" y="989.0" font-size="19" font-weight="700" text-anchor="middle" fill="#1f2933">PostgreSQL + pgvector</text>
+<text x="1040.0" y="1016.0" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">users · documents · chunks and embeddings</text>
+<text x="1040.0" y="1043.0" font-size="19" font-weight="400" text-anchor="middle" fill="#1f2933">stored in the pgdata volume</text>
+<path d="M 300 350 L 300 510" fill="none" stroke="#1f2933" stroke-width="2.5" marker-end="url(#ah)"/>
+<text x="316" y="440" font-size="18" font-weight="700" fill="#1f2933" text-anchor="start">2. API requests (HTTPS, Bearer token)</text>
+<text x="900" y="248" font-size="18" font-weight="700" fill="#1f2933" text-anchor="middle">1. load app</text>
+<text x="900" y="270" font-size="18" font-weight="700" fill="#1f2933" text-anchor="middle">files</text>
+<text x="900" y="292" font-size="18" font-weight="700" fill="#1f2933" text-anchor="middle">(HTTPS)</text>
+<path d="M 840 325 L 980 325" fill="none" stroke="#1f2933" stroke-width="2.5" marker-end="url(#ah)"/>
+<path d="M 780 660 L 780 940" fill="none" stroke="#1f2933" stroke-width="2.5" marker-end="url(#ah)"/>
+<text x="796" y="830" font-size="18" font-weight="700" fill="#1f2933" text-anchor="start">3. SQL queries</text>
+<path d="M 1300 660 L 1300 940" fill="none" stroke="#1f2933" stroke-width="2.5" marker-end="url(#ah)"/>
+<text x="1316" y="830" font-size="18" font-weight="700" fill="#1f2933" text-anchor="start">3. SQL queries</text>
+<text x="880" y="1172" font-size="20" fill="#3e4c59" text-anchor="middle"><tspan font-weight="700">How to read it:</tspan> the React app runs in the user's browser. CloudFront and S3 only serve its files.</text>
+<text x="880" y="1204" font-size="20" fill="#3e4c59" text-anchor="middle">The only server that runs our code is the application server.</text>
+</svg>
