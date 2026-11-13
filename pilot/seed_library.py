@@ -15,10 +15,10 @@ with the same account to see the library this script loads.
 --check uploads each of the 8 target documents, runs the plain-language
 searches listed below for each (worded differently from the document),
 reports where the target came out in the results, and then deletes the
-targets it uploaded. A target passes if it is in the top 3 for every search.
-Most searches were written with the document in mind; the last one for T4 is a
-volunteer's own wording from the pilot (KV-47), so a document that only
-passes the prepared searches does not count as findable.
+targets it uploaded. A target passes if it is in the top 3 for the prepared
+searches and in the top 2 for the wording a pilot volunteer actually typed
+(T1 to T6, KV-47 and KV-48). The prepared searches were written with the
+document in mind; the volunteers' were not, so they are the more honest test.
 
 Add --verbose to see, for every search, the five best results with their
 scores, so you can tell what is outranking the target.
@@ -38,18 +38,28 @@ QUERIES = {
     "T1_composting_at_home": ["what can I do with leftover vegetable scraps in the garden", "how to turn food waste into soil"],
     "T2_how_vaccines_work": ["how does getting a shot protect me from disease", "why do booster shots work"],
     "T3_index_funds_for_beginners": ["low cost way to invest in the whole stock market", "what is an index fund"],
-    "T4_first_marathon_training": [
-        "how should I prepare to run 26 miles",
-        "beginner running plan for a long race",
-        # Typed by pilot volunteer P4, who did not find the document (KV-47).
-        "A gradual weekly running plan for someone preparing for their first 26.2-mile race.",
-    ],
+    "T4_first_marathon_training": ["how should I prepare to run 26 miles", "beginner running plan for a long race"],
     "T5_why_sourdough_rises": ["why does bread dough puff up", "what makes homemade bread with wild yeast taste tangy"],
     "T6_sleep_and_memory": ["does getting enough rest help me remember things", "what happens in the brain at night"],
     "T7_bike_commuting": ["tips for riding my bike to work", "how to stay safe cycling in traffic"],
     "T8_how_solar_panels_work": ["how do rooftop panels make electricity", "turn sunlight into power for my house"],
 }
 TOP_N = 3
+
+# What pilot volunteers P1 to P6 actually typed for their own document (from
+# pilot/results/observation-log.csv). These are the real test of search: they
+# were not written with the document in mind. P2, P5 and P6 found theirs at
+# rank 2 or 3 and P4 did not find it (KV-47, KV-48), so they must now be in the
+# top 2.
+VOLUNTEER_QUERIES = {
+    "T1_composting_at_home": "How do I turn kitchen scraps and yard waste into compost at home?",
+    "T2_how_vaccines_work": "Explain how vaccines teach the body to recognize germs and build protection.",
+    "T3_index_funds_for_beginners": "Beginner-friendly guide to investing in a fund that tracks a market index.",
+    "T4_first_marathon_training": "A gradual weekly running plan for someone preparing for their first 26.2-mile race.",
+    "T5_why_sourdough_rises": "What makes sourdough bread dough expand and form bubbles during fermentation?",
+    "T6_sleep_and_memory": "How does getting enough sleep help the brain store and remember information?",
+}
+VOLUNTEER_TOP_N = 2
 
 
 def sign_in(client: httpx.Client, email: str, password: str) -> bool:
@@ -111,7 +121,7 @@ def check(client: httpx.Client, verbose: bool = False) -> int:
     ours: list[int] = []  # documents this run uploaded, deleted again at the end
     failures = 0
     try:
-        print(f"{'target':32} position in results per search (top {TOP_N} passes)")
+        print(f"{'target':32} position in results per search (last one = volunteer's wording)")
         for path in sorted((DOCS / "targets").glob("*.pdf")):
             r = upload(client, path)
             if r.status_code == 200:
@@ -123,10 +133,13 @@ def check(client: httpx.Client, verbose: bool = False) -> int:
                 print(f"FAILED upload {path.name}: {r.status_code} {r.text}")
                 return 1
 
-            queries = QUERIES[path.stem]
+            wanted = [(q, TOP_N) for q in QUERIES[path.stem]]
+            if path.stem in VOLUNTEER_QUERIES:
+                wanted.append((VOLUNTEER_QUERIES[path.stem], VOLUNTEER_TOP_N))
+            queries = [q for q, _ in wanted]
             found = [search(client, q) for q in queries]
             ranks = [rank_of(results, doc_id) for results in found]
-            ok = all(rank is not None and rank <= TOP_N for rank in ranks)
+            ok = all(rank is not None and rank <= limit for rank, (_, limit) in zip(ranks, wanted))
             failures += not ok
             shown = [str(rank) if rank else "not found" for rank in ranks]
             print(f"{path.stem:32} {'  '.join(f'{x:>9}' for x in shown)}   {'ok' if ok else 'FIX THIS ONE'}")
