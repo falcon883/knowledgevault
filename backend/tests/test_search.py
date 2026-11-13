@@ -64,3 +64,21 @@ def test_search_validation(client):
     assert client.post("/search", json={"query": "   "}).status_code == 400
     assert client.post("/search", json={"query": "x", "limit": 0}).status_code == 422
     assert client.post("/search", json={}).status_code == 422
+
+
+def test_result_shows_the_passage_that_matched(client, library):
+    """KV-48: the snippet is the sentence that matches the query, with the matching words listed."""
+    r = client.post("/search", json={"query": "which cheese goes on the pasta", "limit": 3, "min_score": 0})
+    assert r.status_code == 200, r.text
+    hit = next(x for x in r.json()["results"] if x["filename"] == "check_cooking.txt")
+    assert "parmesan cheese" in hit["snippet"]
+    assert {"cheese", "pasta"} <= set(hit["matched_terms"])
+    assert len(hit["snippet"]) <= 301  # SNIPPET_CHARS plus one ellipsis character
+
+
+def test_result_without_matching_words_still_has_a_snippet(client, library):
+    r = client.post("/search", json={"query": "quantum chromodynamics", "limit": 3, "min_score": 0})
+    assert r.status_code == 200, r.text
+    for hit in r.json()["results"]:
+        assert hit["snippet"]
+        assert hit["matched_terms"] == []

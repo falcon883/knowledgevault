@@ -28,9 +28,10 @@ choose a password for it and have the volunteers sign in with that account.
 You can also set `PILOT_EMAIL` and `PILOT_PASSWORD` instead of the flags.
 
 `--check` uploads each target, runs the plain-language searches for it (two
-prepared ones, plus a volunteer's own wording for T4 from the pilot, KV-47),
-prints where it ranked, and deletes the targets again. A target passes if it is
-in the top 3 for every search. Add `--verbose` to see the five best results and
+prepared ones, plus for T1 to T6 the wording the pilot volunteer actually
+typed), prints where it ranked, and deletes the targets again. A target passes
+if it is in the top 3 for the prepared searches and in the top 2 for the
+volunteer's wording. Add `--verbose` to see the five best results and
 their scores for each search, and, when the target is missing, whether it was
 outranked or scored below the minimum. Run it with the real model, since the
 stand-in embedder used in some tests ranks differently.

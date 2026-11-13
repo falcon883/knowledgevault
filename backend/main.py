@@ -47,6 +47,7 @@ from enrichment import enrich
 from init_db import upgrade_schema
 from auth import AuthError, get_current_user, router as auth_router
 from models import Chunk, Document, User
+from passage import best_passage
 from settings import CORS_ORIGINS
 from uploads import (
     MAX_UPLOAD_BYTES,
@@ -461,10 +462,12 @@ def search_documents(
     Semantic search (KV-16). Embeds the query with the same model used at
     upload time, finds the closest chunks by cosine distance in pgvector,
     and returns one result per document: its best-matching chunk, a
-    similarity score (1.0 = identical meaning, around 0 = unrelated), and
-    the document's tags/summary. Results below `min_score` (default 0.25)
-    are left out so unrelated documents don't pad the list. Backs the
-    search screen (KV-18). Only the signed-in user's documents are searched.
+    similarity score (1.0 = identical meaning, around 0 = unrelated), the
+    passage of that chunk that matches the query best (KV-48) with the query
+    words found in it, and the document's tags/summary. Results below
+    `min_score` (default 0.25) are left out so unrelated documents don't pad
+    the list. Backs the search screen (KV-18). Only the signed-in user's
+    documents are searched.
     """
     query = request.query.strip()
     if not query:
@@ -494,12 +497,15 @@ def search_documents(
             # Rows are closest-first, so everything after this is lower too.
             break
         doc = chunk.document
+        # KV-48: show the sentence that matched, not just the start of the chunk.
+        snippet, matched_terms = best_passage(chunk.text, query, SNIPPET_CHARS)
         results.append(
             {
                 "document_id": doc.id,
                 "filename": doc.filename,
                 "score": score,
-                "snippet": chunk.text[:SNIPPET_CHARS],
+                "snippet": snippet,
+                "matched_terms": matched_terms,
                 "chunk_index": chunk.chunk_index,
                 "tags": doc.tags,
                 "summary": doc.summary,

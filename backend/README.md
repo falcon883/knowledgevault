@@ -537,7 +537,8 @@ Response:
       "document_id": 3,
       "filename": "notes.pdf",
       "score": 0.6123,
-      "snippet": "The telescope observed a distant galaxy...",
+      "snippet": "The telescope observed a distant galaxy and measured how fast it is moving away from Earth.",
+      "matched_terms": ["universe"],
       "chunk_index": 0,
       "tags": null,
       "summary": null
@@ -547,6 +548,12 @@ Response:
 ```
 
 - One result per document: its best-matching chunk, closest first.
+- `snippet` is the part of that chunk that matches the query (KV-48): the
+  sentence sharing the most words with the query, plus the sentences after it
+  while they fit in 300 characters. If no word matches (the chunk matched by
+  meaning alone), it is the start of the chunk. `matched_terms` lists the query
+  words found in the snippet, lowercase, so a screen can highlight them; it is
+  empty in that case. The picking is in `passage.py` and uses words only.
 - `score` is cosine similarity (1.0 = same meaning, near 0 = unrelated).
   Scores are relative, so use them for ordering rather than as a pass/fail
   cutoff.
