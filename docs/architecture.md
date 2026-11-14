@@ -1,9 +1,9 @@
 # KnowledgeVault — Architecture
 
-_KV-45 deliverable. Presentation tier: Percival Tapera. Application and data
-tiers: Durvank Deorukhkar. This document describes the system as built at
-the end of Sprint 4 (Nov 12, 2026); the deployment section describes the
-static hosting and the application server as deployed on Nov 8._
+_KV-45 deliverable, brought up to date in Sprint 5 (KV-55, Nov 14, 2026).
+Presentation tier: Percival Tapera. Application and data tiers: Durvank
+Deorukhkar. It describes the system as deployed on that date. Things that
+are planned but not built are listed at the end, under "Not built yet"._
 
 ## Overview
 
@@ -64,10 +64,31 @@ filters, and reduced-motion support.
 
 - **Auth (KV-42):** signup and login issue a 24-hour JWT (HS256, signed
   with `SECRET_KEY`); passwords are bcrypt-hashed. Every route requires
-  the token except `/health`, `/auth/signup`, `/auth/login` and the API
-  docs, and every document query is scoped to the token's user. Errors
-  come back as `{detail, code}` (for example `invalid_credentials`,
-  `email_taken`, `weak_password`, `token_expired`).
+  the token except `/health`, the sign-in, sign-up and password reset
+  routes, and the API docs, and every document query is scoped to the
+  token's user.
+- **Password reset (KV-53):** `POST /auth/forgot-password` always answers
+  the same way, whether or not the email has an account, so it cannot be
+  used to find out who is registered. When there is an account it emails
+  a single-use link that expires after 30 minutes. Only a SHA-256 hash of
+  the link's token is stored (table `password_reset_tokens`), a newer
+  link cancels older ones, and the email is sent after the response so
+  the request is not slowed. `POST /auth/reset-password` checks the token,
+  sets the new password and signs the user in. Mail goes out through
+  Amazon SES over SMTP (`mailer.py`); with no mail server configured the
+  link is written to the server log instead.
+- **Sign-in limits (KV-54):** 5 wrong passwords for one email, or 20 from
+  one client address, within 10 minutes, and further attempts get `429
+  too_many_attempts` with a `Retry-After` header until the oldest failure
+  ages out. Caddy sets the client address, so it cannot be forged. The
+  counts live in the single server process's memory (`ratelimit.py`), so a
+  restart clears them.
+- **One error format (KV-24, KV-52):** every error comes back as
+  `{detail, code}`: `detail` is a message the screen can show as it is
+  and `code` is stable for the screen to branch on (`invalid_credentials`,
+  `file_too_large`, `duplicate_document`, `empty_query`,
+  `too_many_attempts` and so on). The full list is in the
+  [backend README](../backend/README.md#upload-errors).
 - **Ingestion:** upload (limit `MAX_UPLOAD_MB`, 10 by default) stores
   the document, extracts its text, splits it into chunks of at most 800
   characters at sentence boundaries with a small overlap (KV-38), embeds
@@ -79,8 +100,12 @@ filters, and reduced-motion support.
   documents is rejected with `409 duplicate_document` pointing at the
   stored one (KV-25); another user's copy does not count.
 - **Search:** the query is embedded and matched against the user's chunk
-  vectors in pgvector; results are grouped to one best snippet per
-  document.
+  vectors in pgvector by cosine similarity; results are grouped to one per
+  document, matches below a minimum score (0.25) are hidden, and each
+  result carries the passage that matches best and the query words found
+  in it (KV-48, `passage.py`), so a screen can show why it matched. A
+  blank query or one over 500 characters is refused with a clear error
+  (KV-52).
 - **Configuration and health (KV-37):** all settings come from
   environment variables (`DATABASE_URL`, `SECRET_KEY`, `CORS_ORIGINS`,
   `MAX_UPLOAD_MB`, ...) and the server refuses to start without the
@@ -93,12 +118,14 @@ filters, and reduced-motion support.
   is reachable from the internet, and it obtains the HTTPS certificate
   for the `sslip.io` name automatically. `deploy/smoke_test.py` checks a
   running server end to end (sign up, upload, search, per-user
-  isolation, delete).
+  isolation, delete). `deploy/deploy.sh` (KV-60) updates the server with one
+  command: pull, rebuild, wait until the backend is healthy, check the
+  public address.
 
 ### Tier 3, data: PostgreSQL + pgvector
 
-PostgreSQL 16 with the pgvector extension and three tables (`users`,
-`documents`, `chunks`), running in its own container on the application
+PostgreSQL 16 with the pgvector extension and four tables (`users`,
+`documents`, `chunks` and `password_reset_tokens`), running in its own container on the application
 server's EC2 instance with its data in the `pgdata` Docker volume. The
 schema is managed by Alembic migrations (KV-36), applied automatically
 when the application starts and safe on databases that already hold
@@ -120,8 +147,20 @@ enrichment complete. Re-uploading content the user already has gets
 the UI can warn about the duplicate (KV-25).
 
 **Search.** `POST /search { query, limit }` → ranked results, one per
-document, each with snippet, similarity score, tags and summary. The
+document, each with the matching passage (`snippet`), the query words
+found in it (`matched_terms`), similarity score, tags and summary. The
 UI normalises scores against the top result for the relevance bar.
+
+**Forgot password.** The user asks for a reset with their email →
+`POST /auth/forgot-password` returns the same `202` message every time →
+if the email has an account, the application server creates a token, stores
+its hash and emails `<FRONTEND_URL>/?reset_token=<token>` through Amazon SES
+→ the user opens the link and sends the token with a new password to
+`POST /auth/reset-password` → the token is marked used in one atomic
+update, the password is replaced and the response is a normal sign-in
+(`invalid_reset_token`, `reset_token_expired` and `reset_token_used` are the
+failure codes). Sessions that were already open stay valid until their token
+expires, up to 24 hours.
 
 ## Deployment
 
@@ -133,8 +172,15 @@ demo and deliverables:
   (Caddy, the FastAPI application, PostgreSQL) under Docker Compose. Caddy
   serves HTTPS at `https://3-13-43-176.sslip.io` (sslip.io turns the
   server's IP into a hostname, so no domain is needed). Updating is
-  `git pull` then `docker compose -f docker-compose.prod.yml up -d --build`;
-  database migrations run on start. Setup steps are in `deploy/README.md`.
+  `bash deploy/deploy.sh` on the server (it pulls, rebuilds with
+  `docker compose -f docker-compose.prod.yml up -d --build`, and waits for
+  the health check); database migrations run on start. The server is in
+  us-east-2. Setup steps are in `deploy/README.md`.
+- **Email:** password reset emails are sent through Amazon SES (SMTP, us-east-2).
+  The account is still in the SES sandbox, so mail only reaches verified
+  addresses, and the messages can land in a spam folder because they are sent
+  from a Gmail address. SES is an external service and is not drawn in the
+  diagram.
 - **Static content hosting (presentation tier):** the static Vite build
   in an S3 bucket behind CloudFront at
   `https://d33bsamq53gtgw.cloudfront.net`, built with `VITE_API_URL` set
@@ -145,8 +191,26 @@ demo and deliverables:
   development) and the CloudFront address. A new frontend address must be
   added there, followed by `docker compose -f docker-compose.prod.yml up -d`
   on the server.
-- **Secrets:** `SECRET_KEY` and the database password live only in the
-  server's `.env`; nothing secret is committed or sent to the browser.
+- **Secrets:** `SECRET_KEY`, the database password and the SES credentials live
+  only in the server's `.env`; nothing secret is committed or sent to the
+  browser.
+
+## Quality evidence
+
+What was run against the system, and the results, are in
+[`testing-and-pilot.md`](testing-and-pilot.md): 360 automated tests, a
+104-check pass over the live API, a 29-query search-quality test (29 of 29 with
+a relevant source in the top 5) and a pilot with six volunteers (5 of 6
+succeeded).
+
+## Not built yet
+
+- Password reset screens in the React app (KV-59); the API side is done.
+- Upload progress and a link to the saved document (KV-49), highlighting the
+  matched words in results (KV-57) and showing the API's error messages for
+  rejected uploads and failed searches (KV-58).
+- Sessions are not cancelled when a password changes, and the sign-in
+  counters are lost when the server restarts.
 
 ## Repository layout
 
@@ -154,9 +218,10 @@ demo and deliverables:
 frontend/              React SPA (this document's frontend sections)
 backend/               FastAPI service, ingestion pipeline, Alembic migrations, tests
 e2e/                   Playwright end-to-end tests (browser against the real API)
-deploy/                Caddyfile, server setup guide, end-to-end smoke test
-pilot/                 Sample documents and seed script for the pilot sessions
-docs/                  Project documents and this file
+deploy/                Caddyfile, server setup guide, deploy.sh, smoke test, live functionality pass
+eval/                  Search-quality test: documents, queries and expected sources
+pilot/                 Sample documents, seed script and results of the pilot sessions
+docs/                  Project documents, this file, the user guide, testing summary and QA results
 docker-compose.yml     Local development: backend + Postgres
 docker-compose.prod.yml  Server: Caddy + backend + Postgres
 .github/workflows/     CI: ci.yml (backend tests, Docker build and smoke test),

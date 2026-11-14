@@ -4,6 +4,20 @@ FastAPI service for KnowledgeVault: ingestion, semantic search, tags and
 summaries, and the browse API used by the React frontend (see the
 [root README](../README.md) for the whole project).
 
+## Sprint 5: search results, errors, password reset, sign-in limits
+
+- **KV-47, KV-48**: each search result carries the passage that matched the
+  query and the query words found in it, after the pilot showed people could not
+  tell results apart. See [Search](#search).
+- **KV-52**: upload and search edge cases get clear errors, and every error has
+  the same `{detail, code}` shape. See [Search and server errors](#search-and-server-errors-kv-52).
+- **KV-53**: password reset by email. See [Password reset](#password-reset).
+- **KV-54**: repeated wrong passwords are rate limited. See
+  [Sign-in limits](#sign-in-limits).
+- **KV-50, KV-60, KV-61** (outside the app code): a live functionality pass
+  (`../deploy/functionality_pass.py`), a one-command deploy script
+  (`../deploy/deploy.sh`) and the search-quality test (`../eval/`).
+
 ## Sprint 4: configuration
 
 - **KV-37**: settings come from environment variables, so the same code runs
@@ -324,6 +338,7 @@ against a throwaway Postgres with pgvector. The tests are in `tests/`:
 | `test_responsiveness.py` | searches during an upload, model loaded at startup (KV-33) |
 | `test_settings.py` | required settings, CORS origins, `/health` with the database up and down (KV-37) |
 | `test_auth.py` | signup, login, tokens, 401 errors, one user not seeing another's documents (KV-42) |
+| `test_edge_cases.py` | documents with too much text, blank, over-long and unusual searches, the model failing, the database being down, and missing documents and addresses, each with its error code (KV-52) |
 | `test_password_reset.py` | reset links: emailed, single use, expiry, no account enumeration; sending mail (KV-53) |
 | `test_login_limits.py` | failed sign-ins per email and per address: the 429, the wait ending, normal logins untouched (KV-54) |
 | `test_migrations.py` | migrations build the schema the models describe; databases from before Alembic or before accounts keep their documents and chunks; a failed upgrade changes nothing (KV-36) |
@@ -705,7 +720,9 @@ Response:
 |---|---|
 | `GET /health` | Status check: database reachable (503 if not), model loaded, upload limit. Public |
 | `POST /auth/signup` | Create an account; returns a token. Public |
-| `POST /auth/login` | Sign in; returns a token. Public |
+| `POST /auth/login` | Sign in; returns a token. Public. Rate limited, see [Sign-in limits](#sign-in-limits) |
+| `POST /auth/forgot-password` | Email a password reset link. Always answers the same way. Public. See [Password reset](#password-reset) |
+| `POST /auth/reset-password` | Set a new password with the token from the link; returns a token. Public |
 | `GET /auth/me` | The signed-in user |
 | `POST /upload` | Upload a PDF or text file; persists it, chunks it, embeds each chunk, adds tags and a summary |
 | `POST /search` | Semantic search over your documents: returns the best-matching ones for a query |
@@ -714,7 +731,7 @@ Response:
 | `GET /tags` | Every tag in your documents with its document count, for the tag filter |
 | `DELETE /documents/{id}` | Delete one of your documents and its chunks |
 
-Everything except `/health`, `/auth/signup`, `/auth/login` and the `/docs` page
+Everything except `/health`, the four `/auth` routes above and the `/docs` page
 needs a token (see [Accounts](#accounts)).
 
 ### Browsing: `GET /documents`, `GET /documents/{id}`, `GET /tags`
@@ -743,13 +760,17 @@ first (ties A to Z). "Recipes" and "recipes" count as one tag.
 
 ## Next steps
 
-From the pilot session (KV-28) and the Sprint 4 work:
+What is left, as of Sprint 5:
 
-- **Search quality (KV-47, KV-48):** one volunteer could not find a document
-  with their own wording, and the right result was first for only 2 of 6.
-  Candidates: hybrid keyword and meaning matching, re-ranking by the best
-  passage, and returning the matching passage with each result.
-- **Password reset:** not built. It needs email sending (for example AWS SES) and
-  reset-token endpoints.
-- **Login attempts are not rate limited.** Worth adding before real users.
+- **Frontend for the finished API features:** password reset screens (KV-59),
+  showing the API's error messages for rejected uploads and failed searches
+  (KV-58) and highlighting `matched_terms` in results (KV-57).
+- **Sessions after a password change:** existing sign-ins stay valid until their
+  token expires (24 hours). Closing that needs a per-user token version or a
+  list of revoked tokens.
+- **Rate limit counters** live in the memory of the one server process and reset on
+  a restart. Moving them to the database would keep them, and would be needed
+  before running more than one server process.
+- **Ranking ideas, only if the search-quality test or users show a need:** hybrid
+  keyword and meaning matching, and a higher default `min_score`.
 - Possible later improvement: swap the extractive summary for an LLM-written one if the team decides the API dependency is worth it.
