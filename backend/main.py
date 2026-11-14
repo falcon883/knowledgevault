@@ -38,6 +38,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, defer
+from sqlalchemy.exc import InterfaceError, OperationalError
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import embeddings
 from chunking import chunk_text
@@ -118,6 +121,61 @@ async def upload_error_handler(request: Request, exc: UploadError):
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail, "code": exc.code, **exc.extra},
+    )
+
+
+class SearchError(UploadError):
+    """
+    A search problem (KV-52), in the same {"detail", "code"} shape as upload
+    errors, so the screen handles both the same way. It reuses the UploadError
+    handler above.
+    """
+
+
+# What `code` an HTTPException gets when the code does not name anything more
+# specific. Every error from this API is {"detail": <message>, "code": <code>}.
+HTTP_ERROR_CODES = {
+    400: "bad_request",
+    401: "unauthorized",
+    403: "forbidden",
+    404: "not_found",
+    405: "method_not_allowed",
+    413: "payload_too_large",
+    429: "too_many_requests",
+    503: "service_unavailable",
+}
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error_handler(request: Request, exc: StarletteHTTPException):
+    """
+    KV-52: plain HTTP errors (a missing document, an unknown address) get a
+    `code` too, so the front end never has to guess which shape it is holding.
+    """
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "code": HTTP_ERROR_CODES.get(exc.status_code, "error")},
+        headers=getattr(exc, "headers", None),
+    )
+
+
+@app.exception_handler(OperationalError)
+@app.exception_handler(InterfaceError)
+@app.exception_handler(PoolTimeoutError)
+async def database_unavailable_handler(request: Request, exc: Exception):
+    """
+    KV-52: the database cannot be reached (it is restarting, or the connection
+    pool is exhausted). That is temporary, so say so with a 503 and a message
+    the user can read, instead of a bare "Internal Server Error".
+    """
+    logger.error("Database unavailable on %s %s", request.method, request.url.path, exc_info=exc)
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "KnowledgeVault can't reach its database right now. Please try again in a moment.",
+            "code": "service_unavailable",
+        },
+        headers={"Retry-After": "5"},
     )
 
 
@@ -434,8 +492,13 @@ def list_tags(
 MIN_SCORE = 0.25
 
 
+# The longest search accepted. Checked in the endpoint, not by the request model,
+# so a too-long search gets a readable message instead of a validation list.
+MAX_QUERY_CHARS = 500
+
+
 class SearchRequest(BaseModel):
-    query: str = Field(..., max_length=500, description="What to look for, in plain language.")
+    query: str = Field(..., description="What to look for, in plain language (up to 500 characters).")
     limit: int = Field(5, ge=1, le=20, description="Maximum number of documents to return.")
     min_score: float = Field(
         MIN_SCORE,
@@ -471,9 +534,24 @@ def search_documents(
     """
     query = request.query.strip()
     if not query:
-        raise HTTPException(status_code=400, detail="Query must not be empty.")
+        raise SearchError(400, "empty_query", "Type something to search for.")
+    if len(query) > MAX_QUERY_CHARS:
+        raise SearchError(
+            400,
+            "query_too_long",
+            f"Searches can be up to {MAX_QUERY_CHARS} characters, and this one is {len(query)}. "
+            "Try describing it more briefly.",
+        )
 
-    query_vector = embed_text(query)
+    try:
+        query_vector = embed_text(query)
+    except Exception:
+        logger.exception("Could not embed the search query")
+        raise SearchError(
+            503,
+            "search_unavailable",
+            "Search isn't available right now. Please try again in a moment.",
+        )
     distance = Chunk.embedding.cosine_distance(query_vector)
 
     rows = db.execute(

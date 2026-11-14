@@ -20,6 +20,7 @@ Every upload error comes back in the same shape (see main.py):
 | password_protected_pdf  | 422    | PDF needs a password                        |
 | unreadable_text         | 422    | not plain text (binary data)                |
 | no_text                 | 422    | readable file, but no text in it            |
+| text_too_long           | 422    | more text than MAX_TEXT_CHARS (see below)   |
 | duplicate_document      | 409    | same content as a document already stored   |
 | processing_failed       | 500    | text was fine, saving or embedding failed   |
 
@@ -43,6 +44,13 @@ logging.getLogger("pypdf").setLevel(logging.ERROR)
 
 MAX_UPLOAD_MB = float(os.getenv("MAX_UPLOAD_MB", "10"))
 MAX_UPLOAD_BYTES = int(MAX_UPLOAD_MB * 1024 * 1024)
+
+# KV-52: the most text one document may hold. A file under the size limit can
+# still hold millions of characters (a 10 MB text file), which would mean
+# thousands of chunks to embed: minutes of work that tie up a small server and
+# leave the user waiting. 500,000 characters is about 160 pages and 625 chunks.
+MAX_TEXT_CHARS = 500_000
+CHARS_PER_PAGE = 3000  # rough, for the "about N pages" in the message
 
 SUPPORTED_TYPES = {"application/pdf": "pdf", "text/plain": "text"}
 EXTENSION_KINDS = {".pdf": "pdf", ".txt": "text"}
@@ -96,6 +104,16 @@ def detect_kind(filename: str | None, content_type: str | None) -> tuple[str, st
     )
 
 
+def _too_long() -> "UploadError":
+    pages = MAX_TEXT_CHARS // CHARS_PER_PAGE // 10 * 10
+    return UploadError(
+        422,
+        "text_too_long",
+        f"This document has too much text to process (the limit is about {pages} pages). "
+        "Try splitting it into parts.",
+    )
+
+
 def check_size(contents: bytes) -> None:
     """
     `contents` is read with a cap of MAX_UPLOAD_BYTES + 1, so a file over the
@@ -127,7 +145,14 @@ def _extract_pdf(contents: bytes) -> str:
                 "password_protected_pdf",
                 "This PDF is password-protected. Remove the password and upload it again.",
             )
-        pages = [page.extract_text() or "" for page in reader.pages]
+        pages = []
+        total = 0
+        for page in reader.pages:
+            page_text = page.extract_text() or ""
+            total += len(page_text)
+            if total > MAX_TEXT_CHARS:
+                raise _too_long()  # stop reading: a long PDF is slow to read page by page
+            pages.append(page_text)
     except UploadError:
         raise
     except Exception:
@@ -172,6 +197,9 @@ def extract_text(kind: str, contents: bytes) -> str:
     # Postgres text columns cannot hold NUL characters, and some PDFs
     # produce them, so drop them here rather than fail at insert time.
     text = text.replace("\x00", "").strip()
+
+    if len(text) > MAX_TEXT_CHARS:
+        raise _too_long()
 
     if not text:
         if kind == "pdf":
