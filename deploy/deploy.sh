@@ -17,65 +17,72 @@
 
 set -euo pipefail
 
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
-COMPOSE="docker compose -f docker-compose.prod.yml"
-WAIT_SECONDS="${WAIT_SECONDS:-180}"
+# Everything runs inside main(), called on the last line. Bash therefore reads the
+# whole script before running any of it, so `git pull` replacing this very file
+# part way through (when a change touches deploy.sh) cannot confuse the run.
+main() {
 
-step() { printf '\n==> %s\n' "$*"; }
+  cd "$(dirname "${BASH_SOURCE[0]}")/.."
+  COMPOSE="docker compose -f docker-compose.prod.yml"
+  WAIT_SECONDS="${WAIT_SECONDS:-180}"
 
-old=$(git rev-parse --short HEAD)
+  step() { printf '\n==> %s\n' "$*"; }
 
-fail() {
-  printf '\nDEPLOY FAILED: %s\n' "$1" >&2
-  printf '\nThe end of the backend log:\n' >&2
-  $COMPOSE logs --tail 40 backend >&2 || true
-  printf '\nTo go back to the version that was running (database migrations are not undone):\n' >&2
-  printf '    git reset --hard %s && bash deploy/deploy.sh\n' "$old" >&2
-  exit 1
-}
+  old=$(git rev-parse --short HEAD)
 
-[ -f .env ] || { echo "There is no .env in $(pwd). See deploy/README.md, step 4." >&2; exit 1; }
+  fail() {
+    printf '\nDEPLOY FAILED: %s\n' "$1" >&2
+    printf '\nThe end of the backend log:\n' >&2
+    $COMPOSE logs --tail 40 backend >&2 || true
+    printf '\nTo go back to the version that was running (database migrations are not undone):\n' >&2
+    printf '    git reset --hard %s && bash deploy/deploy.sh\n' "$old" >&2
+    exit 1
+  }
 
-step "Pulling the latest code (now at $old)"
-git pull --ff-only
-new=$(git rev-parse --short HEAD)
-if [ "$old" = "$new" ]; then
-  echo "Already up to date."
-else
-  echo "Updated $old -> $new:"
-  git log --oneline "$old..$new"
-fi
+  [ -f .env ] || { echo "There is no .env in $(pwd). See deploy/README.md, step 4." >&2; exit 1; }
 
-step "Building and starting the containers"
-$COMPOSE up -d --build || fail "docker compose could not build or start the containers."
-
-step "Waiting for the backend to be healthy (up to ${WAIT_SECONDS}s)"
-backend=$($COMPOSE ps -q backend)
-[ -n "$backend" ] || fail "the backend container is not running."
-deadline=$((SECONDS + WAIT_SECONDS))
-while true; do
-  status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$backend" 2>/dev/null || echo unknown)
-  if [ "$status" = "healthy" ]; then
-    echo "The backend is healthy."
-    break
+  step "Pulling the latest code (now at $old)"
+  git pull --ff-only
+  new=$(git rev-parse --short HEAD)
+  if [ "$old" != "$new" ]; then
+    echo "Updated $old -> $new:"
+    git log --oneline "$old..$new"
   fi
-  [ "$SECONDS" -lt "$deadline" ] || fail "the backend is still '$status' after ${WAIT_SECONDS}s."
-  sleep 3
-done
 
-host=$(grep -E '^API_HOST=' .env | head -n1 | cut -d= -f2- | tr -d "\"' " || true)
-if [ -n "$host" ]; then
-  step "Checking https://$host/health"
-  for attempt in 1 2 3 4 5; do
-    if body=$(curl -fsS --max-time 10 "https://$host/health"); then
-      echo "$body"
+  step "Building and starting the containers"
+  $COMPOSE up -d --build || fail "docker compose could not build or start the containers."
+
+  step "Waiting for the backend to be healthy (up to ${WAIT_SECONDS}s)"
+  backend=$($COMPOSE ps -q backend)
+  [ -n "$backend" ] || fail "the backend container is not running."
+  deadline=$((SECONDS + WAIT_SECONDS))
+  while true; do
+    status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$backend" 2>/dev/null || echo unknown)
+    if [ "$status" = "healthy" ]; then
+      echo "The backend is healthy."
       break
     fi
-    [ "$attempt" -lt 5 ] || fail "https://$host/health did not answer (Caddy may still be getting its certificate; try again in a minute)."
+    [ "$SECONDS" -lt "$deadline" ] || fail "the backend is still '$status' after ${WAIT_SECONDS}s."
     sleep 3
   done
-fi
 
-step "Containers"
-$COMPOSE ps
-printf '\nDeployed %s.\n' "$new"
+  host=$(grep -E '^API_HOST=' .env | head -n1 | cut -d= -f2- | tr -d "\"' " || true)
+  if [ -n "$host" ]; then
+    step "Checking https://$host/health"
+    for attempt in 1 2 3 4 5; do
+      if body=$(curl -fsS --max-time 10 "https://$host/health"); then
+        echo "$body"
+        break
+      fi
+      [ "$attempt" -lt 5 ] || fail "https://$host/health did not answer (Caddy may still be getting its certificate; try again in a minute)."
+      sleep 3
+    done
+  fi
+
+  step "Containers"
+  $COMPOSE ps
+  printf '\nDeployed %s.\n' "$new"
+}
+
+main "$@"
+exit
