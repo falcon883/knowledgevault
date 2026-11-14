@@ -408,12 +408,45 @@ stable for the frontend to branch on:
 | `password_protected_pdf` | 422 | PDF needs a password |
 | `unreadable_text` | 422 | not plain text (binary data) |
 | `no_text` | 422 | readable file, but no text in it (for example a scanned PDF) |
+| `text_too_long` | 422 | more text than one document may hold (500,000 characters, about 160 pages) |
 | `duplicate_document` | 409 | same content as a document already stored (adds `existing`) |
 | `processing_failed` | 500 | text was fine, but saving or embedding failed; nothing is kept |
 
 A file sent with a generic type (`application/octet-stream` or none) is
 judged by its extension. `GET /health` reports the active limit as
 `max_upload_mb`.
+
+A file under the size limit can still hold far more text than a small server
+can embed in a reasonable time (a 10 MB text file is millions of characters),
+so a document is also refused when its text passes `MAX_TEXT_CHARS` in
+`uploads.py` (500,000 characters, about 160 pages). A PDF is checked page by
+page and reading stops as soon as it is over, so a huge one fails quickly.
+
+### Search and server errors (KV-52)
+
+Every error from the API has the same two fields, `detail` (a message the
+screen can show as it is) and `code` (stable, for the screen to branch on).
+Upload errors are above; these are the rest:
+
+| code | status | when |
+|---|---|---|
+| `empty_query` | 400 | `/search` with a blank query |
+| `query_too_long` | 400 | `/search` query over 500 characters |
+| `search_unavailable` | 503 | the embedding model failed while searching |
+| `service_unavailable` | 503 | the database cannot be reached; the response has `Retry-After: 5` |
+| `not_found` | 404 | no such document (someone else's document gives the same answer), or no such address |
+| `method_not_allowed` | 405 | wrong HTTP method for an address |
+| `bad_request`, `unauthorized`, `forbidden`, `too_many_requests` | 400, 401, 403, 429 | used when a plain HTTP error carries no more specific code |
+| auth codes | 400, 401, 409 | sign-in problems, see [Accounts](#accounts) |
+
+Not changed: a request that does not match the expected shape (a missing
+field, `limit` of 0) still returns FastAPI's own 422 with a `detail` list, and
+a crash nobody anticipated still returns a plain 500. The screens only send
+valid requests, so the first does not come up in normal use.
+
+Searches of any other kind (one letter, a number such as `26.2`, only
+punctuation, an emoji, SQL or HTML typed into the box) are ordinary text: they
+are embedded and answered with a normal results list, possibly empty.
 
 ### Duplicate uploads
 
