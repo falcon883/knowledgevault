@@ -41,6 +41,14 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
+      # Password reset (KV-53), all optional. Empty means the default: no
+      # email is sent and reset links go to the log.
+      FRONTEND_URL: ${FRONTEND_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
       interval: 10s

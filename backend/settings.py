@@ -14,6 +14,16 @@ the file.
                     (default: the local Vite dev server)
     MAX_UPLOAD_MB   largest upload accepted (default 10, read in uploads.py)
 
+Password reset (KV-53), all optional:
+
+    FRONTEND_URL        where the app is served; reset links point here
+                        (default: the first CORS_ORIGINS entry)
+    RESET_TOKEN_MINUTES how long a reset link works (default 30)
+    SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, MAIL_FROM
+                        an outgoing mail server. Without SMTP_HOST no email is
+                        sent and the reset link is written to the server log
+                        instead (see mailer.py)
+
 Tests only: TEST_DATABASE_URL, KV_FAKE_EMBEDDINGS, BCRYPT_ROUNDS (see
 tests/conftest.py).
 """
@@ -87,3 +97,13 @@ BCRYPT_ROUNDS = int_env("BCRYPT_ROUNDS", default=12, minimum=4, maximum=16)
 CORS_ORIGINS = parse_origins(os.getenv("CORS_ORIGINS", DEFAULT_CORS_ORIGINS)) or parse_origins(
     DEFAULT_CORS_ORIGINS
 )
+
+# --- Password reset (KV-53) ---
+FRONTEND_URL = os.getenv("FRONTEND_URL", "").strip().rstrip("/") or CORS_ORIGINS[0]
+RESET_TOKEN_MINUTES = int_env("RESET_TOKEN_MINUTES", default=30, minimum=5, maximum=24 * 60)
+
+SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+SMTP_PORT = int_env("SMTP_PORT", default=587, minimum=1, maximum=65535)
+SMTP_USER = os.getenv("SMTP_USER", "").strip()
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+MAIL_FROM = os.getenv("MAIL_FROM", "").strip() or SMTP_USER

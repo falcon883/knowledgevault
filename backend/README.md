@@ -250,6 +250,9 @@ file. `.env` is in `.gitignore`, so your passwords stay out of the repo.
 | `CORS_ORIGINS` | no | `http://localhost:5173` | Browser origins allowed to call the API, comma-separated, no trailing slash. Add the deployed frontend's URL here, e.g. `http://localhost:5173,https://app.example.com`. |
 | `SECRET_KEY` | yes | none | Signs the sign-in tokens. At least 32 characters and kept secret; generate one with `python -c "import secrets; print(secrets.token_hex(32))"`. Changing it signs everyone out. |
 | `ACCESS_TOKEN_HOURS` | no | `24` | How long a sign-in lasts. |
+| `FRONTEND_URL` | no | first `CORS_ORIGINS` entry | Where the app is served. Password reset links point here. |
+| `RESET_TOKEN_MINUTES` | no | `30` | How long a password reset link works (5 to 1440). |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` | no | none (port `587`) | An outgoing mail server for reset emails. Without `SMTP_HOST` nothing is sent and the link is written to the server log. See [Password reset](#password-reset). |
 | `MAX_UPLOAD_MB` | no | `10` | Largest upload accepted. See [Upload errors](#upload-errors). |
 
 Only for tests: `TEST_DATABASE_URL` (use a separate database),
@@ -318,6 +321,7 @@ against a throwaway Postgres with pgvector. The tests are in `tests/`:
 | `test_responsiveness.py` | searches during an upload, model loaded at startup (KV-33) |
 | `test_settings.py` | required settings, CORS origins, `/health` with the database up and down (KV-37) |
 | `test_auth.py` | signup, login, tokens, 401 errors, one user not seeing another's documents (KV-42) |
+| `test_password_reset.py` | reset links: emailed, single use, expiry, no account enumeration; sending mail (KV-53) |
 | `test_migrations.py` | migrations build the schema the models describe; databases from before Alembic or before accounts keep their documents and chunks; a failed upgrade changes nothing (KV-36) |
 
 ## Accounts
@@ -363,7 +367,8 @@ The frontend can branch on `code`:
 | 401 | `token_expired` | The token is old. Sign in again |
 | 401 | `invalid_credentials` | Wrong email or password (the same answer for both, so it does not reveal which emails have accounts) |
 | 409 | `email_taken` | Signup with an email that already has an account |
-| 422 | `invalid_email`, `weak_password`, `password_too_long` | Signup input that is not acceptable |
+| 422 | `invalid_email`, `weak_password`, `password_too_long` | Signup (or password reset) input that is not acceptable |
+| 400 | `invalid_reset_token`, `reset_token_expired`, `reset_token_used` | A password reset link that cannot be used (see [Password reset](#password-reset)) |
 
 All 401 responses also carry `WWW-Authenticate: Bearer`.
 
@@ -383,8 +388,68 @@ them to your account:
 python claim_documents.py you@example.com
 ```
 
-**Not included yet:** password reset, email confirmation, and limits on how
-often someone can try to sign in. There is also no way to delete an account.
+**Not included yet:** email confirmation, and limits on how often someone can
+try to sign in. There is also no way to delete an account.
+
+### Password reset
+
+Two calls, both with a JSON body, neither needing a token (KV-53):
+
+```
+POST /auth/forgot-password   {"email": "you@example.com"}
+POST /auth/reset-password    {"token": "...", "password": "a new password"}
+```
+
+1. **Ask for a link.** `forgot-password` always answers `202` with
+   `{"message": "If an account exists for that email, we have sent a link ..."}`,
+   whether or not the address has an account, so it cannot be used to find out
+   who has one. The frontend shows that message. A badly formed address gets
+   `422 invalid_email`.
+2. **The email** has a link to the app with the token in the address:
+   `<FRONTEND_URL>/?reset_token=<token>`. The app's home page reads
+   `reset_token` from the address when it loads and shows a "choose a new
+   password" form.
+3. **Set the password.** `reset-password` sends the token and the new password
+   (8 to 72 characters). On success it answers `200` with the same body as
+   login (`access_token`, `user`), so the user is signed in straight away.
+
+| Status | `code` | When |
+|---|---|---|
+| 400 | `invalid_reset_token` | The token was never issued, or was changed |
+| 400 | `reset_token_expired` | The link is older than `RESET_TOKEN_MINUTES` (30 by default) |
+| 400 | `reset_token_used` | The link was already used, or a newer link replaced it |
+| 422 | `weak_password`, `password_too_long` | The new password is not acceptable. The link is not used up, so the user can try again |
+
+How it is kept safe: the token is 256 random bits and only its SHA-256 is
+stored, so a copy of the database cannot reset anyone's password. A link works
+once. Asking for a new link cancels the older one, and using a link cancels any
+others for the account. Asking again within a minute sends nothing new, so the
+form cannot fill someone's inbox. The email is sent after the answer, so it
+takes the same time whether or not the account exists.
+
+**Sending the email.** Set `SMTP_HOST`, `SMTP_PORT` (default 587, which uses
+STARTTLS; 465 uses SSL), `SMTP_USER`, `SMTP_PASSWORD` and `MAIL_FROM`, for
+example for Gmail with an [app password](https://myaccount.google.com/apppasswords):
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_USER=you@gmail.com
+SMTP_PASSWORD=<16-character app password>
+FRONTEND_URL=https://<your frontend address>
+```
+
+With no `SMTP_HOST` nothing is sent. The whole message, including the link, is
+written to the server log instead, which is enough to try it locally. On the
+server:
+
+```bash
+docker compose -f docker-compose.prod.yml logs backend | grep -A8 "Email is not set up"
+```
+
+A mail server that is down is logged and does not change the answer to the user.
+
+**Known limit:** changing a password does not sign out sessions that are
+already open; they end when their token expires (`ACCESS_TOKEN_HOURS`).
 
 ## Upload errors
 
