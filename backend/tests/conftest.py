@@ -33,6 +33,7 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
+import auth  # noqa: E402
 import embeddings  # noqa: E402
 import main  # noqa: E402
 import uploads  # noqa: E402
@@ -59,6 +60,14 @@ if os.getenv("KV_FAKE_EMBEDDINGS") == "1":
 def database():
     """Bring the test database up to date with the migrations (KV-36)."""
     upgrade_schema()
+
+
+@pytest.fixture(autouse=True)
+def fresh_login_limits():
+    """KV-54: every test client signs in from the same address, so start each test with no failures counted."""
+    auth.login_limits.reset()
+    yield
+    auth.login_limits.reset()
 
 
 @pytest.fixture(autouse=True)

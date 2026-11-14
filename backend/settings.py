@@ -14,6 +14,14 @@ the file.
                     (default: the local Vite dev server)
     MAX_UPLOAD_MB   largest upload accepted (default 10, read in uploads.py)
 
+Sign-in limits (KV-54), all optional:
+
+    LOGIN_MAX_FAILURES_PER_EMAIL  wrong passwords allowed per email (default 5)
+    LOGIN_MAX_FAILURES_PER_IP     wrong passwords allowed per client address
+                                  (default 20; higher because people share one)
+    LOGIN_WINDOW_MINUTES          failures count for this long, and a lockout
+                                  lasts at most this long (default 10)
+
 Password reset (KV-53), all optional:
 
     FRONTEND_URL        where the app is served; reset links point here
@@ -107,3 +115,8 @@ SMTP_PORT = int_env("SMTP_PORT", default=587, minimum=1, maximum=65535)
 SMTP_USER = os.getenv("SMTP_USER", "").strip()
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 MAIL_FROM = os.getenv("MAIL_FROM", "").strip() or SMTP_USER
+
+# --- Limits on failed sign-ins (KV-54) ---
+LOGIN_MAX_FAILURES_PER_EMAIL = int_env("LOGIN_MAX_FAILURES_PER_EMAIL", default=5, minimum=1, maximum=1000)
+LOGIN_MAX_FAILURES_PER_IP = int_env("LOGIN_MAX_FAILURES_PER_IP", default=20, minimum=1, maximum=10000)
+LOGIN_WINDOW_MINUTES = int_env("LOGIN_WINDOW_MINUTES", default=10, minimum=1, maximum=24 * 60)

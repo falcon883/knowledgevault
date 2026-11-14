@@ -250,6 +250,9 @@ file. `.env` is in `.gitignore`, so your passwords stay out of the repo.
 | `CORS_ORIGINS` | no | `http://localhost:5173` | Browser origins allowed to call the API, comma-separated, no trailing slash. Add the deployed frontend's URL here, e.g. `http://localhost:5173,https://app.example.com`. |
 | `SECRET_KEY` | yes | none | Signs the sign-in tokens. At least 32 characters and kept secret; generate one with `python -c "import secrets; print(secrets.token_hex(32))"`. Changing it signs everyone out. |
 | `ACCESS_TOKEN_HOURS` | no | `24` | How long a sign-in lasts. |
+| `LOGIN_MAX_FAILURES_PER_EMAIL` | no | `5` | Wrong passwords allowed for one email before sign-in is refused for a while. See [Sign-in limits](#sign-in-limits). |
+| `LOGIN_MAX_FAILURES_PER_IP` | no | `20` | The same, per client address (higher, because people share one). |
+| `LOGIN_WINDOW_MINUTES` | no | `10` | Failures are forgotten after this long, which is also the longest a lockout lasts. |
 | `FRONTEND_URL` | no | first `CORS_ORIGINS` entry | Where the app is served. Password reset links point here. |
 | `RESET_TOKEN_MINUTES` | no | `30` | How long a password reset link works (5 to 1440). |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` | no | none (port `587`) | An outgoing mail server for reset emails. Without `SMTP_HOST` nothing is sent and the link is written to the server log. See [Password reset](#password-reset). |
@@ -322,6 +325,7 @@ against a throwaway Postgres with pgvector. The tests are in `tests/`:
 | `test_settings.py` | required settings, CORS origins, `/health` with the database up and down (KV-37) |
 | `test_auth.py` | signup, login, tokens, 401 errors, one user not seeing another's documents (KV-42) |
 | `test_password_reset.py` | reset links: emailed, single use, expiry, no account enumeration; sending mail (KV-53) |
+| `test_login_limits.py` | failed sign-ins per email and per address: the 429, the wait ending, normal logins untouched (KV-54) |
 | `test_migrations.py` | migrations build the schema the models describe; databases from before Alembic or before accounts keep their documents and chunks; a failed upgrade changes nothing (KV-36) |
 
 ## Accounts
@@ -367,10 +371,12 @@ The frontend can branch on `code`:
 | 401 | `token_expired` | The token is old. Sign in again |
 | 401 | `invalid_credentials` | Wrong email or password (the same answer for both, so it does not reveal which emails have accounts) |
 | 409 | `email_taken` | Signup with an email that already has an account |
+| 429 | `too_many_attempts` | Too many wrong passwords for this email or from this address. Wait; see [Sign-in limits](#sign-in-limits) |
 | 422 | `invalid_email`, `weak_password`, `password_too_long` | Signup (or password reset) input that is not acceptable |
 | 400 | `invalid_reset_token`, `reset_token_expired`, `reset_token_used` | A password reset link that cannot be used (see [Password reset](#password-reset)) |
 
-All 401 responses also carry `WWW-Authenticate: Bearer`.
+All 401 responses also carry `WWW-Authenticate: Bearer`, and the 429 carries
+`Retry-After` (seconds).
 
 **One user cannot see another's documents.** Every document query is filtered
 by the signed-in user. Asking for someone else's document returns the same 404
@@ -388,8 +394,39 @@ them to your account:
 python claim_documents.py you@example.com
 ```
 
-**Not included yet:** email confirmation, and limits on how often someone can
-try to sign in. There is also no way to delete an account.
+**Not included yet:** email confirmation, and deleting an account.
+
+### Sign-in limits
+
+`POST /auth/login` counts wrong passwords (KV-54). After 5 for one email, or 20
+from one client address, within 10 minutes, further attempts get
+`429 too_many_attempts` with a message like "Too many failed sign-in attempts.
+Try again in 8 minutes." and a `Retry-After` header. The frontend should show
+`detail`.
+
+- The wait ends by itself: it lasts until the oldest counted failure is 10
+  minutes old, so at most 10 minutes.
+- Only failures count. A correct password is never slowed down, and a
+  successful sign-in forgets that email's failures.
+- During a lockout the password is not checked, so even the right one is
+  refused, and refused attempts do not extend the wait.
+- Emails without an account are limited the same way, so the limit does not
+  reveal which emails exist. Requests the server rejects as malformed (422) are
+  not counted.
+- One locked email does not affect other emails. Password reset and signup are
+  not blocked by a lockout.
+- The client address comes from `X-Forwarded-For`: Caddy sets it to the address
+  it saw, and the last entry is used. Without a proxy (local development) the
+  connection's own address is used.
+
+The numbers are `LOGIN_MAX_FAILURES_PER_EMAIL`, `LOGIN_MAX_FAILURES_PER_IP` and
+`LOGIN_WINDOW_MINUTES` (see [Configuration](#configuration)). Counts are kept in
+memory by the one server process (code in `ratelimit.py`), so a restart clears
+them.
+
+**Known limit:** someone who knows an email can lock that email out for up to 10
+minutes by failing on purpose. The owner can still use password reset, which is
+not blocked.
 
 ### Password reset
 

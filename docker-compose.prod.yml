@@ -41,6 +41,10 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
+      # Limits on failed sign-ins (KV-54), optional; empty means the default.
+      LOGIN_MAX_FAILURES_PER_EMAIL: ${LOGIN_MAX_FAILURES_PER_EMAIL:-}
+      LOGIN_MAX_FAILURES_PER_IP: ${LOGIN_MAX_FAILURES_PER_IP:-}
+      LOGIN_WINDOW_MINUTES: ${LOGIN_WINDOW_MINUTES:-}
       # Password reset (KV-53), all optional. Empty means the default: no
       # email is sent and reset links go to the log.
       FRONTEND_URL: ${FRONTEND_URL:-}
