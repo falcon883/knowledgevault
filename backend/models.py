@@ -48,6 +48,23 @@ class User(Base):
         return f"<User id={self.id} email={self.email!r}>"
 
 
+class PasswordResetToken(Base):
+    """
+    A password reset link (KV-53). Only the SHA-256 of the token is stored, so a
+    copy of the database cannot be used to reset anyone's password. A link works
+    once (`used_at`) and until `expires_at`.
+    """
+
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+
+
 class Document(Base):
     __tablename__ = "documents"
 

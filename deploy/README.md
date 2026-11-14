@@ -34,7 +34,7 @@ is closest to Worcester).
 - **Image:** Ubuntu Server 24.04 LTS
 - **Instance type:** `t3.small` (2 GB of memory; the embedding model needs more than a `t3.micro` has)
 - **Key pair:** create a new one (RSA, `.pem`). Keep the file somewhere safe,
-  for example `C:\Users\<you>\.ssh\knowledgevault.pem`. You cannot download it again.
+  for example `C:\Users\<you>\.ssh\knowledgevault-key.pem`. You cannot download it again.
 - **Network settings, Edit**, new security group with three rules:
   SSH (22) from **My IP**, HTTP (80) from **Anywhere**, HTTPS (443) from **Anywhere**
 - **Storage:** 20 GiB gp3
@@ -49,14 +49,14 @@ IP down.
 From PowerShell on your computer (use your key path and the Elastic IP):
 
 ```powershell
-ssh -i C:\Users\<you>\.ssh\knowledgevault.pem ubuntu@<ELASTIC-IP>
+ssh -i C:\Users\<you>\.ssh\knowledgevault-key.pem ubuntu@<ELASTIC-IP>
 ```
 
 If Windows says `UNPROTECTED PRIVATE KEY FILE`, fix the file's permissions once:
 
 ```powershell
-icacls C:\Users\<you>\.ssh\knowledgevault.pem /inheritance:r
-icacls C:\Users\<you>\.ssh\knowledgevault.pem /grant:r "$($env:USERNAME):(R)"
+icacls C:\Users\<you>\.ssh\knowledgevault-key.pem /inheritance:r
+icacls C:\Users\<you>\.ssh\knowledgevault-key.pem /grant:r "$($env:USERNAME):(R)"
 ```
 
 On the server:
@@ -91,6 +91,13 @@ In `.env`, fill in:
 | `POSTGRES_PASSWORD` | The password you just generated |
 | `SECRET_KEY` | Another random value, from `openssl rand -hex 32`. It signs the sign-in tokens, so keep it secret; changing it signs everyone out. |
 | `CORS_ORIGINS` | `http://localhost:5173` for now. When the frontend is deployed, add its address after a comma, for example `http://localhost:5173,https://app.example.com` |
+
+These are optional, and turn on password reset emails (KV-53):
+
+| Setting | Value |
+|---|---|
+| `FRONTEND_URL` | The address of the deployed app, for example `https://d33bsamq53gtgw.cloudfront.net`. Reset links point here. Without it the first `CORS_ORIGINS` entry is used. |
+| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` | An outgoing mail server. For Gmail: `smtp.gmail.com`, your address, and an [app password](https://myaccount.google.com/apppasswords) (needs 2-step verification), and `MAIL_FROM` can stay empty. With no `SMTP_HOST`, no email is sent and the reset link is written to the backend log: `docker compose -f docker-compose.prod.yml logs backend \| grep -A8 "Email is not set up"`. |
 
 Save with `Ctrl+O`, `Enter`, then `Ctrl+X`. `.env` stays on the server and is
 never committed.

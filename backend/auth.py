@@ -4,6 +4,8 @@ KnowledgeVault backend - accounts and sign-in (KV-42).
     POST /auth/signup   create an account, returns a token
     POST /auth/login    check email and password, returns a token
     GET  /auth/me       who the token belongs to
+    POST /auth/forgot-password  email a link for choosing a new password (KV-53)
+    POST /auth/reset-password   set a new password with the token from that link
 
 A token is sent with every other request as `Authorization: Bearer <token>`.
 Passwords are stored only as bcrypt hashes. Tokens are signed with SECRET_KEY
@@ -19,24 +21,36 @@ errors do:
                               both, so it does not reveal which emails exist)
     409  email_taken          signup with an email that already has an account
     422  invalid_email, weak_password, password_too_long
+    400  invalid_reset_token  the reset token was never issued, or is damaged
+    400  reset_token_expired  the reset link is older than RESET_TOKEN_MINUTES
+    400  reset_token_used     the reset link was already used, or a newer one replaced it
 """
 
+import hashlib
 import re
+import secrets
 from datetime import datetime, timedelta, timezone
 from functools import cache
 
 import bcrypt
 import jwt
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import User
-from settings import ACCESS_TOKEN_HOURS, BCRYPT_ROUNDS, SECRET_KEY
+from mailer import send_email
+from models import PasswordResetToken, User, utcnow
+from settings import (
+    ACCESS_TOKEN_HOURS,
+    BCRYPT_ROUNDS,
+    FRONTEND_URL,
+    RESET_TOKEN_MINUTES,
+    SECRET_KEY,
+)
 
 ALGORITHM = "HS256"
 MIN_PASSWORD_LENGTH = 8
@@ -45,6 +59,11 @@ MAX_EMAIL_LENGTH = 254
 RESERVED_EMAIL_DOMAIN = "knowledgevault.local"  # used by the default user (init_db.py)
 
 EMAIL_PATTERN = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+
+# KV-53: one reset email per account per minute, so the form cannot be used to
+# fill someone's inbox. Requests inside the minute get the usual answer and
+# send nothing.
+RESET_COOLDOWN_SECONDS = 60
 
 
 class AuthError(Exception):
@@ -213,3 +232,127 @@ def login(body: Credentials, db: Session = Depends(get_db)):
 def me(user: User = Depends(get_current_user)):
     """The signed-in user. Handy for the frontend to check a stored token."""
     return {"id": user.id, "email": user.email}
+
+
+# --- password reset (KV-53) ------------------------------------------------------
+
+
+def hash_reset_token(token: str) -> str:
+    """What is stored for a reset token. A fast hash is fine: the token is 256 random bits."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def reset_link(token: str) -> str:
+    # The token goes in the query string of the app's home page, so the link
+    # works on a static host with no special routing for a /reset-password page.
+    return f"{FRONTEND_URL}/?reset_token={token}"
+
+
+def send_reset_email(email: str, token: str) -> None:
+    send_email(
+        email,
+        "Reset your KnowledgeVault password",
+        "Someone asked to reset the password for this KnowledgeVault account.\n\n"
+        f"To choose a new password, open this link within {RESET_TOKEN_MINUTES} minutes:\n\n"
+        f"{reset_link(token)}\n\n"
+        "If that was not you, ignore this email. Your password stays the same.\n",
+    )
+
+
+class ForgotPassword(BaseModel):
+    email: str = Field(..., max_length=1000, examples=["you@example.com"])
+
+
+class ResetPassword(BaseModel):
+    token: str = Field(..., max_length=1000, description="The token from the link in the email.")
+    password: str = Field(..., max_length=1000)
+
+
+@router.post("/forgot-password", status_code=202)
+def forgot_password(body: ForgotPassword, background: BackgroundTasks, db: Session = Depends(get_db)):
+    """
+    Email a link for choosing a new password. The answer is always the same,
+    whether or not the address has an account, so this cannot be used to find
+    out who has one. The email is sent after the answer, so it takes the same
+    time either way. Asking again invalidates the previous link.
+    """
+    email = clean_email(body.email)
+    user = db.scalar(select(User).where(User.email == email))
+    if user is not None:
+        now = utcnow()
+        recent = db.scalar(
+            select(PasswordResetToken.id)
+            .where(
+                PasswordResetToken.user_id == user.id,
+                PasswordResetToken.created_at > now - timedelta(seconds=RESET_COOLDOWN_SECONDS),
+            )
+            .limit(1)
+        )
+        if recent is None:
+            token = secrets.token_urlsafe(32)
+            db.execute(
+                update(PasswordResetToken)
+                .where(PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None))
+                .values(used_at=now)  # an older, unused link stops working
+            )
+            db.add(
+                PasswordResetToken(
+                    user_id=user.id,
+                    token_hash=hash_reset_token(token),
+                    created_at=now,
+                    expires_at=now + timedelta(minutes=RESET_TOKEN_MINUTES),
+                )
+            )
+            db.commit()
+            background.add_task(send_reset_email, user.email, token)
+
+    return {
+        "message": "If an account exists for that email, we have sent a link to reset the password. "
+        f"It works for {RESET_TOKEN_MINUTES} minutes."
+    }
+
+
+@router.post("/reset-password")
+def reset_password(body: ResetPassword, db: Session = Depends(get_db)):
+    """
+    Set a new password with the token from the emailed link. Each link works
+    once, and only until it expires. On success the user is signed in: the
+    response is the same as login's.
+    """
+    used = AuthError(
+        400, "reset_token_used", "This reset link was already used or replaced by a newer one. Ask for a new one if you still need it."
+    )
+    row = db.scalar(
+        select(PasswordResetToken).where(PasswordResetToken.token_hash == hash_reset_token(body.token.strip()))
+    )
+    if row is None:
+        raise AuthError(400, "invalid_reset_token", "This reset link is not valid. Ask for a new one.")
+    if row.used_at is not None:
+        raise used
+    now = utcnow()
+    if row.expires_at <= now:
+        raise AuthError(400, "reset_token_expired", "This reset link has expired. Ask for a new one.")
+
+    # Checked before the link is used up, so a too-short password can be fixed and tried again.
+    check_new_password(body.password)
+
+    # Claim the link. If two requests arrive together only one can change the row.
+    claimed = db.execute(
+        update(PasswordResetToken)
+        .where(PasswordResetToken.id == row.id, PasswordResetToken.used_at.is_(None))
+        .values(used_at=now)
+    )
+    if claimed.rowcount != 1:
+        db.rollback()
+        raise used
+
+    user = db.get(User, row.user_id)
+    user.password_hash = hash_password(body.password)
+    db.execute(  # any other outstanding links for this account are done too
+        update(PasswordResetToken)
+        .where(PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None))
+        .values(used_at=now)
+    )
+    db.commit()
+    db.refresh(user)
+    return token_response(user)
