@@ -1,0 +1,39 @@
+{
+  "about": "Expected-source key for the search-quality test (see eval/README.md). Each query lists the document(s) that count as a relevant source. Written before the first run against the real model; do not edit a query to make it pass.",
+  "queries": [
+    {"id": "Q01", "type": "paraphrase", "query": "my plant's leaves are yellowing and the soil never dries out", "expected": ["B01_houseplant_care_basics.pdf"]},
+    {"id": "Q02", "type": "paraphrase", "query": "what can I do with eggshells and fruit peels instead of throwing them away", "expected": ["T1_composting_at_home.pdf"]},
+    {"id": "Q03", "type": "paraphrase", "query": "why do I feel worn out and sore the day after getting an injection", "expected": ["T2_how_vaccines_work.pdf"]},
+    {"id": "Q04", "type": "paraphrase", "query": "easy way to put savings in the stock market without choosing companies", "expected": ["T3_index_funds_for_beginners.pdf"]},
+    {"id": "Q05", "type": "paraphrase", "query": "how many weeks should I train before my first long-distance race", "expected": ["T4_first_marathon_training.pdf"]},
+    {"id": "Q06", "type": "paraphrase", "query": "what is the stretchy network in dough that traps the gas", "expected": ["T5_why_sourdough_rises.pdf"]},
+    {"id": "Q07", "type": "paraphrase", "query": "is pulling an all-nighter before an exam a good idea", "expected": ["T6_sleep_and_memory.pdf"]},
+    {"id": "Q08", "type": "paraphrase", "query": "what lights and lock do I need to commute on two wheels", "expected": ["T7_bike_commuting.pdf"]},
+    {"id": "Q09", "type": "paraphrase", "query": "does a roof full of panels still make power when it is overcast", "expected": ["T8_how_solar_panels_work.pdf"]},
+    {"id": "Q10", "type": "paraphrase", "query": "how can I lower my heating bill this winter", "expected": ["B10_home_energy_saving_tips.pdf"]},
+    {"id": "Q11", "type": "paraphrase", "query": "what number do banks check before they approve a loan", "expected": ["B07_understanding_credit_scores.pdf"]},
+    {"id": "Q12", "type": "paraphrase", "query": "quick dinner with noodles that takes twenty minutes", "expected": ["B02_weeknight_pasta_and_rice.pdf"]},
+    {"id": "Q13", "type": "paraphrase", "query": "how do I write a one-line loop that filters a collection in Python", "expected": ["B03_python_list_comprehensions.pdf"]},
+    {"id": "Q14", "type": "paraphrase", "query": "planning a drive through several parks without wasting days", "expected": ["B04_national_parks_road_trip.pdf"]},
+    {"id": "Q15", "type": "paraphrase", "query": "what did we decide about onboarding at the planning meeting", "expected": ["B05_meeting_notes_q3_planning.pdf"]},
+    {"id": "Q16", "type": "paraphrase", "query": "bodyweight exercises I can do in my living room", "expected": ["B06_home_workout_no_equipment.pdf"]},
+    {"id": "Q17", "type": "paraphrase", "query": "how can I spot Jupiter and Orion without a telescope", "expected": ["B08_beginners_guide_night_sky.pdf"]},
+    {"id": "Q18", "type": "paraphrase", "query": "best way to memorize vocabulary in a new language", "expected": ["B09_learning_spanish_study_tips.pdf"]},
+    {"id": "Q19", "type": "paraphrase", "query": "why does my homemade brew taste bitter and how should I grind the beans", "expected": ["N01_coffee_brewing_methods.txt"]},
+    {"id": "Q20", "type": "paraphrase", "query": "how does a model end up memorising its training data instead of learning", "expected": ["N02_machine_learning_basics.txt"]},
+    {"id": "Q21", "type": "paraphrase", "query": "how should I answer a question about a time I failed at work", "expected": ["N03_job_interview_preparation.txt"]},
+    {"id": "Q22", "type": "paraphrase", "query": "how do I get a blurry background in portraits", "expected": ["N04_photography_exposure_basics.txt"]},
+    {"id": "Q23", "type": "paraphrase", "query": "getting a new kitten used to the house", "expected": ["N05_adopting_a_cat.txt"]},
+    {"id": "Q24", "type": "paraphrase", "query": "what to eat and see in Portugal's capital over a weekend", "expected": ["N06_lisbon_weekend_itinerary.txt"]},
+    {"id": "Q25", "type": "broad", "query": "ways to cut my electricity costs", "expected": ["B10_home_energy_saving_tips.pdf", "T8_how_solar_panels_work.pdf"]},
+    {"id": "Q26", "type": "short", "query": "sourdough starter", "expected": ["T5_why_sourdough_rises.pdf"]},
+    {"id": "Q27", "type": "short", "query": "index fund", "expected": ["T3_index_funds_for_beginners.pdf"]},
+    {"id": "Q28", "type": "short", "query": "learn Spanish", "expected": ["B09_learning_spanish_study_tips.pdf"]},
+    {"id": "Q29", "type": "short", "query": "compost", "expected": ["T1_composting_at_home.pdf"]}
+  ],
+  "negatives": [
+    {"id": "N1", "query": "causes of the French Revolution"},
+    {"id": "N2", "query": "how to fix a leaking kitchen faucet"},
+    {"id": "N3", "query": "how to knit a sweater"}
+  ]
+}

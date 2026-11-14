@@ -1,0 +1,9 @@
+Photography exposure basics
+
+Every photo is a balance of three settings, often called the exposure triangle.
+
+Aperture, written as an f-number such as f/2.8, is how wide the lens opens. A small number lets in more light and blurs the background, which suits portraits. A large number such as f/11 keeps more of the scene sharp, which suits landscapes.
+
+Shutter speed is how long the sensor collects light. Fast speeds like 1/1000 of a second freeze a running dog or a splash. Slow speeds blur motion, and below about 1/60 you need a tripod to avoid shaky pictures.
+
+ISO is the sensor's sensitivity. A low ISO such as 100 gives clean images in bright light. In dim rooms you can raise it, but high values add grainy noise. Start low and raise ISO last.

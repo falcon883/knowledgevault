@@ -1,0 +1,7 @@
+Machine learning basics
+
+In supervised learning, a model is shown examples with the right answers attached, such as emails marked spam or not spam, and learns a rule that predicts the answer for new examples. In unsupervised learning there are no answers, and the model looks for structure on its own, such as groups of similar customers.
+
+Always split your data before you start. The training set is what the model learns from; the test set is held back and used once at the end, to see how the model does on examples it has never seen. Scoring a model on the data it trained on tells you very little.
+
+The most common failure is overfitting: the model memorises the quirks and noise of the training data instead of the general pattern, so it scores very well in training and badly on new data. More data, a simpler model, and stopping training early all help. Underfitting is the opposite: the model is too simple to capture the pattern at all.
