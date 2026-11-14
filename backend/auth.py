@@ -20,6 +20,8 @@ errors do:
     401  invalid_credentials  wrong email or password (the same answer for
                               both, so it does not reveal which emails exist)
     409  email_taken          signup with an email that already has an account
+    429  too_many_attempts    too many wrong passwords for this email or from this
+                              address (KV-54); Retry-After says how many seconds to wait
     422  invalid_email, weak_password, password_too_long
     400  invalid_reset_token  the reset token was never issued, or is damaged
     400  reset_token_expired  the reset link is older than RESET_TOKEN_MINUTES
@@ -27,6 +29,8 @@ errors do:
 """
 
 import hashlib
+import logging
+import math
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -34,7 +38,7 @@ from functools import cache
 
 import bcrypt
 import jwt
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update
@@ -44,13 +48,19 @@ from sqlalchemy.orm import Session
 from database import get_db
 from mailer import send_email
 from models import PasswordResetToken, User, utcnow
+from ratelimit import LoginLimits
 from settings import (
     ACCESS_TOKEN_HOURS,
     BCRYPT_ROUNDS,
     FRONTEND_URL,
+    LOGIN_MAX_FAILURES_PER_EMAIL,
+    LOGIN_MAX_FAILURES_PER_IP,
+    LOGIN_WINDOW_MINUTES,
     RESET_TOKEN_MINUTES,
     SECRET_KEY,
 )
+
+logger = logging.getLogger("knowledgevault")
 
 ALGORITHM = "HS256"
 MIN_PASSWORD_LENGTH = 8
@@ -69,15 +79,19 @@ RESET_COOLDOWN_SECONDS = 60
 class AuthError(Exception):
     """A sign-in or signup problem, answered as {"detail", "code"} (see main.py)."""
 
-    def __init__(self, status_code: int, code: str, detail: str):
+    def __init__(self, status_code: int, code: str, detail: str, retry_after: int | None = None):
         super().__init__(detail)
         self.status_code = status_code
         self.code = code
         self.detail = detail
+        self.retry_after = retry_after
 
     @property
     def headers(self) -> dict[str, str]:
-        return {"WWW-Authenticate": "Bearer"} if self.status_code == 401 else {}
+        headers = {"WWW-Authenticate": "Bearer"} if self.status_code == 401 else {}
+        if self.retry_after is not None:
+            headers["Retry-After"] = str(self.retry_after)
+        return headers
 
 
 # --- passwords -----------------------------------------------------------------
@@ -215,16 +229,59 @@ def signup(body: Credentials, db: Session = Depends(get_db)):
     return token_response(user)
 
 
+login_limits = LoginLimits(
+    max_per_email=LOGIN_MAX_FAILURES_PER_EMAIL,
+    max_per_ip=LOGIN_MAX_FAILURES_PER_IP,
+    window=LOGIN_WINDOW_MINUTES * 60,
+)
+
+
+def client_address(request: Request) -> str:
+    """
+    Who is signing in from. In production every request comes through Caddy,
+    which replaces any X-Forwarded-For the client sent with the address it
+    actually saw, so the last entry is the real client. Without a proxy (local
+    development, tests) the header is absent and the socket's address is used.
+    """
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[-1].strip()
+    return (forwarded or (request.client.host if request.client else "unknown"))[:64]
+
+
+def too_many_attempts(seconds: int) -> AuthError:
+    minutes = max(1, math.ceil(seconds / 60))
+    return AuthError(
+        429,
+        "too_many_attempts",
+        f"Too many failed sign-in attempts. Try again in {minutes} minute{'s' if minutes != 1 else ''}.",
+        retry_after=seconds,
+    )
+
+
 @router.post("/login")
-def login(body: Credentials, db: Session = Depends(get_db)):
-    """Sign in with email and password. Returns {access_token, token_type, user}."""
+def login(body: Credentials, request: Request, db: Session = Depends(get_db)):
+    """
+    Sign in with email and password. Returns {access_token, token_type, user}.
+    After too many wrong passwords for an email, or from one address, further
+    attempts get 429 `too_many_attempts` until the wait is over (see ratelimit.py).
+    """
+    email = body.email.strip().lower()
+    ip = client_address(request)
+
+    wait = login_limits.retry_after(email, ip)
+    if wait:  # refused before the password is looked at
+        logger.warning("Sign-in refused for %s: too many failed attempts", ip)
+        raise too_many_attempts(wait)
+
     wrong = AuthError(401, "invalid_credentials", "Wrong email or password.")
-    user = db.scalar(select(User).where(User.email == body.email.strip().lower()))
+    user = db.scalar(select(User).where(User.email == email))
     if user is None:
         verify_password(body.password, _dummy_hash())  # take as long as a real check
+        login_limits.record_failure(email, ip)
         raise wrong
     if not verify_password(body.password, user.password_hash):
+        login_limits.record_failure(email, ip)
         raise wrong
+    login_limits.record_success(email)
     return token_response(user)
 
 
