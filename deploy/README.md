@@ -12,6 +12,7 @@ $20 a month while it runs; new AWS accounts usually come with credits, so check
 | `deploy/Caddyfile` | Tells Caddy to get the HTTPS certificate and pass requests to the backend. |
 | `.env.example` (repo root) | The settings the server needs: `API_HOST`, `POSTGRES_PASSWORD`, `SECRET_KEY`, `CORS_ORIGINS`. |
 | `deploy/smoke_test.py` | Checks a running API end to end: health, upload, search, then deletes its own test document. |
+| `deploy/deploy.sh` | Run on the server to deploy the latest code in one command: pull, rebuild, wait until healthy, check the public address. |
 | `deploy/functionality_pass.py` | The full backend checklist against a running API (accounts, every upload type and refusal, browse, search, isolation, delete, and data surviving a restart). Writes `docs/qa/functionality-pass.md` (KV-50). |
 
 The console screens change now and then, so a button may be named a little
@@ -177,10 +178,19 @@ to move them to your account.
 
 All of these run on the server, in the `knowledgevault` folder.
 
+**Deploying:** after a pull request is merged, `ssh` in and run
+`bash deploy/deploy.sh` (KV-60). It pulls the latest `main`, rebuilds and restarts
+the containers, waits until the backend says healthy, checks
+`https://<API_HOST>/health`, and ends with `Deployed <commit>.` It lists the
+commits it brought in. If something fails it stops, shows the end of the backend
+log, and prints the command to go back to the previous commit (database
+migrations are not undone). Running it with nothing new is safe, so it is also
+how a changed `.env` is applied.
+
 | Task | Command |
 |---|---|
-| Deploy a new version | `git pull` then `docker compose -f docker-compose.prod.yml up -d --build` |
-| Change a setting | edit `.env` then `docker compose -f docker-compose.prod.yml up -d` |
+| Deploy a new version | `bash deploy/deploy.sh` (see below) |
+| Change a setting | edit `.env` then `bash deploy/deploy.sh` (or just `docker compose -f docker-compose.prod.yml up -d`) |
 | Read the backend log | `docker compose -f docker-compose.prod.yml logs -f backend` |
 | Back up the database | `docker compose -f docker-compose.prod.yml exec -T db pg_dump -U knowledgevault knowledgevault > backup.sql` |
 
