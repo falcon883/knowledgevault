@@ -12,6 +12,7 @@ $20 a month while it runs; new AWS accounts usually come with credits, so check
 | `deploy/Caddyfile` | Tells Caddy to get the HTTPS certificate and pass requests to the backend. |
 | `.env.example` (repo root) | The settings the server needs: `API_HOST`, `POSTGRES_PASSWORD`, `SECRET_KEY`, `CORS_ORIGINS`. |
 | `deploy/smoke_test.py` | Checks a running API end to end: health, upload, search, then deletes its own test document. |
+| `deploy/functionality_pass.py` | The full backend checklist against a running API (accounts, every upload type and refusal, browse, search, isolation, delete, and data surviving a restart). Writes `docs/qa/functionality-pass.md` (KV-50). |
 
 The console screens change now and then, so a button may be named a little
 differently. Use the same AWS region for everything (**N. Virginia, us-east-1**
@@ -132,7 +133,18 @@ The tables are created on first start, so there is nothing else to set up.
 
    Every line should say `[ok]`. It deletes the test document it uploads, so
    it is safe to run against real data.
-3. Use the deployed API from your local frontend: in `frontend/`, create a file
+3. For a thorough check of every backend feature, run the functionality pass
+   (it takes a couple of minutes, and has two parts around a restart):
+
+   ```bash
+   python deploy/functionality_pass.py https://<API_HOST>
+   docker compose -f docker-compose.prod.yml restart      # on the server
+   python deploy/functionality_pass.py https://<API_HOST> --after-restart
+   ```
+
+   It writes the results to `docs/qa/functionality-pass.md`. Run it from the
+   repository root; the first part needs the sample files in `pilot/` and `e2e/`.
+4. Use the deployed API from your local frontend: in `frontend/`, create a file
    named `.env.local` containing `VITE_API_URL=https://<API_HOST>`, run
    `npm run dev`, and open `http://localhost:5173`.
 

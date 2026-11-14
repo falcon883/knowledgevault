@@ -21,3 +21,4 @@ dist/
 # Private keys (e.g. the AWS SSH key): never commit these
 *.pem
 *.key
+.qa-state.json
