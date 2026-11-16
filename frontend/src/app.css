@@ -743,6 +743,16 @@
   font-size: 0.93rem;
 }
 
+/* KV-57: matched query words inside a search snippet. Bold as well as
+   coloured, so the highlight is not shown by colour alone. */
+.kv-snippet mark {
+  background: #fde68a;
+  color: #1e293b;
+  font-weight: 700;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
 /* --- Empty / loading --------------------------------------------------------- */
 
 .kv-empty {

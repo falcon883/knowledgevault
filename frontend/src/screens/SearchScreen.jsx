@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { getDocument, searchDocuments } from '../api.js';
 import { excerptOf } from '../excerpt.js';
+import { highlightSegments } from '../highlight.js';
 import {
   IconAlertCircle,
   IconArrowRight,
@@ -27,6 +28,10 @@ import searchArt from '../assets/search-art.webp';
  *  - expanding a result loads the document's real source excerpt
  *    (GET /documents/{id}), falling back to the summary when the record
  *    carries no text.
+ *
+ * KV-57 — the snippet's matched_terms (KV-48, returned with every result)
+ * are highlighted with <mark>, so a person can see at a glance why a
+ * result matched. Empty matched_terms leaves the snippet unchanged.
  */
 
 const SNIPPET_MAX = 280;
@@ -285,7 +290,19 @@ export default function SearchScreen({ onBrowseType } = {}) {
                         <span className="kv-relevance-label">Relevance</span>
                       </span>
                     </div>
-                    {snippet && <div className="kv-snippet">{snippet}</div>}
+                    {snippet && (
+                      <div className="kv-snippet">
+                        {highlightSegments(snippet, r.matched_terms).map((seg, i) =>
+                          seg.highlight ? (
+                            <mark key={i} className="kv-highlight">
+                              {seg.text}
+                            </mark>
+                          ) : (
+                            <span key={i}>{seg.text}</span>
+                          ),
+                        )}
+                      </div>
+                    )}
                     <div>
                       {parseTags(r).map((t) => (
                         <span key={t} className="kv-chip">
