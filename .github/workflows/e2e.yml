@@ -10,7 +10,8 @@ on:
 
 jobs:
   e2e:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which this Playwright version cannot install a browser on.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     # The same pgvector image the backend tests use. The tests work in their own
