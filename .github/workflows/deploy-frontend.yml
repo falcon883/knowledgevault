@@ -1,0 +1,78 @@
+# KV — frontend auto-deploy: push to main -> S3 + CloudFront
+# Port this file to the TEAM repo (falcon883/knowledgevault) at
+# .github/workflows/deploy-frontend.yml, the same way as any other
+# frontend change (branch from origin/main, PR, Files-changed check).
+# It mirrors the existing frontend-ci.yml (Node 20, npm ci, lint, test,
+# build) and adds the deploy steps from the manual Nov 11 redeploy.
+#
+# REQUIRED SETUP (see deploy-frontend-SETUP.md next to this file):
+#   - IAM role in Percival's AWS account, OIDC trust to GitHub
+#     (no stored keys). Repo secret: AWS_ROLE_TO_ASSUME (role ARN).
+#   - No other secrets needed. Bucket, distribution and region are
+#     inlined below from the verified Nov 8 deploy state.
+#   - Admin access to the team repo (or Durvank) to add the secret.
+#
+# SAFETY: deploys ONLY on push to main, ONLY when frontend files change.
+# Pull requests run frontend-ci.yml (lint/test/build) and never deploy.
+# If any gate fails, nothing deploys. Automation deploys; it does not
+# verify the live site — still do the quick browser check after a deploy.
+
+name: Deploy Frontend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+
+permissions:
+  id-token: write   # required for OIDC role assumption
+  contents: read
+
+env:
+  AWS_REGION: us-east-2
+  S3_BUCKET: knowledgevault-frontend-percival
+  CLOUDFRONT_DISTRIBUTION_ID: E1TK76OBE1AHL2
+  VITE_API_URL: https://3-13-43-176.sslip.io
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ env.VITE_API_URL }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sync to S3
+        run: aws s3 sync dist/ s3://${{ env.S3_BUCKET }} --delete
+        working-directory: frontend
+
+      - name: Invalidate CloudFront
+        run: >
+          aws cloudfront create-invalidation
+          --distribution-id ${{ env.CLOUDFRONT_DISTRIBUTION_ID }}
+          --paths '/*'
