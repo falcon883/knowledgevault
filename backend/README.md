@@ -340,6 +340,7 @@ against a throwaway Postgres with pgvector. The tests are in `tests/`:
 | `test_auth.py` | signup, login, tokens, 401 errors, one user not seeing another's documents (KV-42) |
 | `test_edge_cases.py` | documents with too much text, blank, over-long and unusual searches, the model failing, the database being down, and missing documents and addresses, each with its error code (KV-52) |
 | `test_password_reset.py` | reset links: emailed, single use, expiry, no account enumeration; sending mail (KV-53) |
+| `test_change_password.py` | changing a password while signed in: wrong current password is 400 not 401, weak and unchanged passwords, wrong guesses limited like sign-in, reset links cancelled (KV-62) |
 | `test_login_limits.py` | failed sign-ins per email and per address: the 429, the wait ending, normal logins untouched (KV-54) |
 | `test_migrations.py` | migrations build the schema the models describe; databases from before Alembic or before accounts keep their documents and chunks; a failed upgrade changes nothing (KV-36) |
 
@@ -442,6 +443,31 @@ them.
 **Known limit:** someone who knows an email can lock that email out for up to 10
 minutes by failing on purpose. The owner can still use password reset, which is
 not blocked.
+
+### Change password
+
+A signed-in user can set a new password without email (KV-62). It needs the token
+and the current password:
+
+```
+POST /auth/change-password   {"current_password": "old one", "new_password": "a new password"}
+```
+
+On success it answers `200 {"message": "Password changed."}`. The token the app
+already holds keeps working, so the user stays signed in.
+
+| Status | `code` | When |
+|---|---|---|
+| 400 | `wrong_password` | The current password is not right. It is 400, not 401, because the app treats any 401 as an expired session and signs the user out |
+| 422 | `weak_password`, `password_too_long` | The new password is not 8 to 72 characters |
+| 422 | `same_password` | The new password is the same as the current one |
+| 429 | `too_many_attempts` | Too many wrong current passwords; `Retry-After` says how long to wait |
+| 401 | `not_authenticated`, `invalid_token`, `token_expired` | No valid token, as everywhere else |
+
+Wrong current passwords count against the same limits as sign-in, so this
+cannot be used to guess a password faster than the login form allows. A
+successful change cancels any unused reset links for the account. Other
+sessions are not signed out (see the "Sessions after a password change" limit below).
 
 ### Password reset
 
@@ -723,6 +749,7 @@ Response:
 | `POST /auth/login` | Sign in; returns a token. Public. Rate limited, see [Sign-in limits](#sign-in-limits) |
 | `POST /auth/forgot-password` | Email a password reset link. Always answers the same way. Public. See [Password reset](#password-reset) |
 | `POST /auth/reset-password` | Set a new password with the token from the link; returns a token. Public |
+| `POST /auth/change-password` | Signed-in user sets a new password. See [Change password](#change-password) |
 | `GET /auth/me` | The signed-in user |
 | `POST /upload` | Upload a PDF or text file; persists it, chunks it, embeds each chunk, adds tags and a summary |
 | `POST /search` | Semantic search over your documents: returns the best-matching ones for a query |

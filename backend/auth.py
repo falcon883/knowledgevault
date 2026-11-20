@@ -6,6 +6,7 @@ KnowledgeVault backend - accounts and sign-in (KV-42).
     GET  /auth/me       who the token belongs to
     POST /auth/forgot-password  email a link for choosing a new password (KV-53)
     POST /auth/reset-password   set a new password with the token from that link
+    POST /auth/change-password  signed-in user sets a new password (KV-62)
 
 A token is sent with every other request as `Authorization: Bearer <token>`.
 Passwords are stored only as bcrypt hashes. Tokens are signed with SECRET_KEY
@@ -23,6 +24,9 @@ errors do:
     429  too_many_attempts    too many wrong passwords for this email or from this
                               address (KV-54); Retry-After says how many seconds to wait
     422  invalid_email, weak_password, password_too_long
+    422  same_password        change-password: the new password is the current one
+    400  wrong_password       change-password: the current password is wrong (400, not
+                              401, so the app does not take it as an expired session)
     400  invalid_reset_token  the reset token was never issued, or is damaged
     400  reset_token_expired  the reset link is older than RESET_TOKEN_MINUTES
     400  reset_token_used     the reset link was already used, or a newer one replaced it
@@ -247,12 +251,12 @@ def client_address(request: Request) -> str:
     return (forwarded or (request.client.host if request.client else "unknown"))[:64]
 
 
-def too_many_attempts(seconds: int) -> AuthError:
+def too_many_attempts(seconds: int, what: str = "sign-in") -> AuthError:
     minutes = max(1, math.ceil(seconds / 60))
     return AuthError(
         429,
         "too_many_attempts",
-        f"Too many failed sign-in attempts. Try again in {minutes} minute{'s' if minutes != 1 else ''}.",
+        f"Too many failed {what} attempts. Try again in {minutes} minute{'s' if minutes != 1 else ''}.",
         retry_after=seconds,
     )
 
@@ -413,3 +417,52 @@ def reset_password(body: ResetPassword, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     return token_response(user)
+
+
+# --- change password (KV-62) -----------------------------------------------------
+
+
+class ChangePassword(BaseModel):
+    current_password: str = Field(..., max_length=1000)
+    new_password: str = Field(..., max_length=1000)
+
+
+@router.post("/change-password")
+def change_password(
+    body: ChangePassword,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Set a new password for the signed-in user. The current password is required,
+    so a stolen or left-open session cannot lock the owner out. A wrong current
+    password is 400 `wrong_password` (not 401: the app treats any 401 as an
+    expired session and signs the user out). Wrong guesses count against the same
+    limits as sign-in, so this cannot be used to try passwords quickly.
+    Outstanding reset links for the account stop working. The current token
+    stays valid, so the user stays signed in.
+    """
+    ip = client_address(request)
+    wait = login_limits.retry_after(user.email, ip)
+    if wait:  # refused before the password is looked at
+        logger.warning("Password change refused for %s: too many failed attempts", ip)
+        raise too_many_attempts(wait, "password")
+
+    if not verify_password(body.current_password, user.password_hash):
+        login_limits.record_failure(user.email, ip)
+        raise AuthError(400, "wrong_password", "Your current password is not right.")
+
+    check_new_password(body.new_password)
+    if body.new_password == body.current_password:
+        raise AuthError(422, "same_password", "Choose a password different from the current one.")
+
+    user.password_hash = hash_password(body.new_password)
+    db.execute(
+        update(PasswordResetToken)
+        .where(PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None))
+        .values(used_at=utcnow())
+    )
+    db.commit()
+    login_limits.record_success(user.email)
+    return {"message": "Password changed."}

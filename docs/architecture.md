@@ -198,7 +198,7 @@ demo and deliverables:
 ## Quality evidence
 
 What was run against the system, and the results, are in
-[`testing-and-pilot.md`](testing-and-pilot.md): 360 automated tests, a
+[`testing-and-pilot.md`](testing-and-pilot.md): 376 automated tests, a
 104-check pass over the live API, a 29-query search-quality test (29 of 29 with
 a relevant source in the top 5) and a pilot with six volunteers (5 of 6
 succeeded).
