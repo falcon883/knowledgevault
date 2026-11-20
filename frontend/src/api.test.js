@@ -1,4 +1,5 @@
 import {
+  changePassword,
   checkHealth,
   forgotPassword,
   login,
@@ -160,5 +161,44 @@ describe('api client', () => {
 
     await expect(listDocuments()).rejects.toMatchObject({ status: 500, detail: 'boom' });
     expect(getToken()).toBe('tok-abc');
+  });
+
+  it('changePassword posts both passwords with the session token (KV-62)', async () => {
+    setToken('tok-abc');
+    const fetchMock = mockFetch(200, { message: 'Password changed.' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(changePassword('old-password', 'new-password')).resolves.toEqual({
+      message: 'Password changed.',
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toContain('/auth/change-password');
+    expect(options.headers.Authorization).toBe('Bearer tok-abc');
+    expect(JSON.parse(options.body)).toEqual({
+      current_password: 'old-password',
+      new_password: 'new-password',
+    });
+  });
+
+  it('a wrong current password is a 400 form error, not a sign-out (KV-62)', async () => {
+    setToken('tok-abc');
+    const handler = vi.fn();
+    setUnauthorizedHandler(handler);
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(400, {
+        detail: 'Your current password is not right.',
+        code: 'wrong_password',
+      }),
+    );
+
+    await expect(changePassword('not-it', 'new-password')).rejects.toMatchObject({
+      status: 400,
+      code: 'wrong_password',
+      detail: 'Your current password is not right.',
+    });
+    expect(getToken()).toBe('tok-abc');
+    expect(handler).not.toHaveBeenCalled();
   });
 });

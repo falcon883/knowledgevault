@@ -110,6 +110,30 @@ export async function resetPassword(token, password) {
 }
 
 /**
+ * Change the signed-in user's password (KV-62; backend KV-62). Needs
+ * the session token and the current password; on success the backend
+ * answers 200 { message } and the same token keeps working, so the
+ * user stays signed in. A wrong current password is a 400
+ * (wrong_password) — deliberately not a 401, so it surfaces as a form
+ * error instead of triggering the session reset above. A weak,
+ * over-long or unchanged new password is a 422 (weak_password,
+ * password_too_long, same_password); repeated wrong current passwords
+ * are a 429 (too_many_attempts). Every error carries the backend's
+ * detail text, which the form shows verbatim.
+ */
+export async function changePassword(currentPassword, newPassword) {
+  const res = await fetch(`${API_BASE}/auth/change-password`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+  });
+  return handleResponse(res, 'Change password');
+}
+
+/**
  * Upload a document (KV-19). Accepts a File/Blob; the backend supports
  * application/pdf and text/plain. Notes and article text are uploaded as
  * text/plain files. Returns the saved document record including tags and

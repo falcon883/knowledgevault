@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { checkHealth } from './api.js';
 import { getToken, clearToken, setUnauthorizedHandler } from './auth.js';
 import AuthScreen from './screens/AuthScreen.jsx';
+import ChangePasswordForm from './ChangePasswordForm.jsx';
 import UploadScreen from './screens/UploadScreen.jsx';
 import BrowseScreen from './screens/BrowseScreen.jsx';
 import SearchScreen from './screens/SearchScreen.jsx';
@@ -38,6 +39,11 @@ import './app.css';
  * the address bar — and hands it to the auth screen, whose reset mode
  * takes over the gate until the token is consumed, even for a user who
  * is still signed in on this browser.
+ *
+ * KV-62 — the top bar carries a Change password button that opens a
+ * panel under the bar (ChangePasswordForm): a signed-in user sets a
+ * new password with their current one, no email round trip, and
+ * stays signed in on the same token.
  *
  * KV-32 — the end-to-end tests found that opening Browse from the sidebar
  * showed a stale list (only the "View in Browse" button refreshed it), so
@@ -91,6 +97,8 @@ function App() {
   const [resetToken, setResetToken] = useState(
     () => new URLSearchParams(window.location.search).get('reset_token') || null,
   );
+  // KV-62 — whether the change-password panel is open under the top bar.
+  const [changingPassword, setChangingPassword] = useState(false);
   // Bumped every time Browse is navigated to from the upload flow, so its
   // list refreshes even though the screen no longer remounts on tab switch.
   const [browseRefresh, setBrowseRefresh] = useState(0);
@@ -168,6 +176,7 @@ function App() {
 
   function signOut() {
     clearToken();
+    setChangingPassword(false);
     setSignedIn(false);
   }
 
@@ -198,16 +207,30 @@ function App() {
                 : 'backend not running'}
           </span>
           {signedIn && (
-            <button
-              type="button"
-              className="kv-btn kv-btn-secondary kv-btn-small"
-              onClick={signOut}
-            >
-              Sign out
-            </button>
+            <>
+              <button
+                type="button"
+                className="kv-btn kv-btn-secondary kv-btn-small"
+                aria-expanded={changingPassword}
+                onClick={() => setChangingPassword((v) => !v)}
+              >
+                Change password
+              </button>
+              <button
+                type="button"
+                className="kv-btn kv-btn-secondary kv-btn-small"
+                onClick={signOut}
+              >
+                Sign out
+              </button>
+            </>
           )}
         </div>
       </header>
+      )}
+
+      {signedIn && !resetToken && changingPassword && (
+        <ChangePasswordForm onClose={() => setChangingPassword(false)} />
       )}
 
       {signedIn && !resetToken ? (
