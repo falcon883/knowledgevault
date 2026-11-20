@@ -140,6 +140,7 @@ python eval/search_quality.py https://your-api-address   # the search-quality te
 | `GET /health` | Status check: database reachable (503 if not), model loaded, upload limit |
 | `POST /auth/signup`, `POST /auth/login` | Create an account or sign in; returns a token |
 | `POST /auth/forgot-password`, `POST /auth/reset-password` | Ask for a reset link by email; set a new password with the token from it |
+| `POST /auth/change-password` | Signed-in user sets a new password (needs the current one) |
 | `GET /auth/me` | The signed-in user |
 | `POST /upload` | Upload a PDF or text file |
 | `GET /documents` | List your documents; optional `tag`, `since` and `sort` filters |

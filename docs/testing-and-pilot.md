@@ -8,14 +8,14 @@ says where the evidence is kept.
 
 | What | Result | Evidence |
 |---|---|---|
-| Backend automated tests | 301 tests, all passing | [`backend/tests/`](../backend/tests), run in CI on every pull request |
+| Backend automated tests | 317 tests, all passing | [`backend/tests/`](../backend/tests), run in CI on every pull request |
 | Frontend automated tests | 31 tests, all passing, plus lint and a production build | [`frontend/src/`](../frontend/src), run in CI |
 | End-to-end browser tests | 28 tests, all passing | [`e2e/`](../e2e), run in CI |
 | Live backend functionality pass | 104 checks, 0 failed, 2 skipped (reason recorded) | [`docs/qa/functionality-pass.md`](qa/functionality-pass.md) |
 | Search quality (charter criterion: 80% of queries with a relevant source in the top 5) | 29 of 29 queries (100%), the right document first every time | [`docs/qa/search-quality.md`](qa/search-quality.md) |
 | Pilot with volunteers (charter criterion: 80% finish both tasks without help) | 5 of 6 (83%) | [`pilot/results/`](../pilot/results) |
 
-That is 360 automated tests in all (301 + 31 + 28).
+That is 376 automated tests in all (317 + 31 + 28).
 
 ## Automated tests
 
@@ -25,7 +25,7 @@ Postgres with pgvector, then builds the Docker stack and smoke-tests it;
 `frontend-ci.yml` runs lint, the frontend tests and a production build;
 `e2e.yml` runs the browser tests.
 
-**Backend (301 tests).** Each file covers one feature:
+**Backend (317 tests).** Each file covers one feature:
 
 | Area | What is checked |
 |---|---|
@@ -35,6 +35,7 @@ Postgres with pgvector, then builds the Docker stack and smoke-tests it;
 | Browse | tag, date and sort filters, document detail, tag counts, delete with everything derived from it |
 | Accounts | sign up, sign in, tokens (expired, forged, for a deleted user), one user never seeing another's documents |
 | Password reset | single-use links, expiry, newer link cancelling older, no way to tell which emails exist, mail sending |
+| Change password | wrong current password is a 400 (never a 401), weak or unchanged passwords, wrong guesses limited like sign-in, unused reset links cancelled |
 | Sign-in limits | the 429 after repeated failures, the wait ending, normal sign-ins unaffected |
 | Configuration and database | required settings, CORS, `/health` with the database up and down, migrations producing the schema the models describe, old databases keeping their data |
 
