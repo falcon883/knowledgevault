@@ -78,6 +78,38 @@ export async function login(email, password) {
 }
 
 /**
+ * Ask for a password-reset email (KV-59; backend KV-53). The backend
+ * answers 202 with the same message whether or not the address has an
+ * account, so callers show that message verbatim and learn nothing
+ * about which addresses are registered. Returns { message }.
+ */
+export async function forgotPassword(email) {
+  const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  return handleResponse(res, 'Request a reset link', { isAuthCall: true });
+}
+
+/**
+ * Set a new password with the token from the reset email (KV-59;
+ * backend KV-53). On success the backend answers as login does —
+ * { access_token, ... } — and the caller stores the token, so the
+ * user lands signed in. A weak password is a 422 and does not spend
+ * the link; a spent, replaced or expired link is a 400 with code
+ * invalid_reset_token, reset_token_used or reset_token_expired.
+ */
+export async function resetPassword(token, password) {
+  const res = await fetch(`${API_BASE}/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, password }),
+  });
+  return handleResponse(res, 'Reset password', { isAuthCall: true });
+}
+
+/**
  * Upload a document (KV-19). Accepts a File/Blob; the backend supports
  * application/pdf and text/plain. Notes and article text are uploaded as
  * text/plain files. Returns the saved document record including tags and

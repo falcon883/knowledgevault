@@ -31,6 +31,14 @@ import './app.css';
  * screen replaces the workspace, and any 401 from the API (expired or
  * invalid token) clears the token and returns the user to sign-in.
  *
+ * KV-59 — a password-reset link (backend KV-53) lands on the app root
+ * with ?reset_token=... in the query. The shell captures the token in
+ * its first state initialiser — before the KV-40 normalisation below
+ * rewrites the URL to the tab hash, which also scrubs the token out of
+ * the address bar — and hands it to the auth screen, whose reset mode
+ * takes over the gate until the token is consumed, even for a user who
+ * is still signed in on this browser.
+ *
  * KV-32 — the end-to-end tests found that opening Browse from the sidebar
  * showed a stale list (only the "View in Browse" button refreshed it), so
  * Browse now re-fetches every time it becomes the active tab, however the
@@ -77,6 +85,12 @@ function App() {
   const [tab, setTab] = useState(() => tabFromHash() ?? 'capture');
   const [backendOk, setBackendOk] = useState(null);
   const [signedIn, setSignedIn] = useState(() => Boolean(getToken()));
+  // KV-59 — the reset token from an emailed link, read once from the
+  // query string (see the header note); null when the visit is not a
+  // reset. While set, the auth screen's reset mode owns the page.
+  const [resetToken, setResetToken] = useState(
+    () => new URLSearchParams(window.location.search).get('reset_token') || null,
+  );
   // Bumped every time Browse is navigated to from the upload flow, so its
   // list refreshes even though the screen no longer remounts on tab switch.
   const [browseRefresh, setBrowseRefresh] = useState(0);
@@ -162,7 +176,7 @@ function App() {
       {/* Signed out, the auth screen renders full-bleed with its own hero
           header (brand + backend status), so the top bar only appears
           once signed in. */}
-      {signedIn && (
+      {signedIn && !resetToken && (
       <header className="kv-topbar">
         <h1 className="kv-brand">
           <span className="kv-brand-mark">
@@ -196,7 +210,7 @@ function App() {
       </header>
       )}
 
-      {signedIn ? (
+      {signedIn && !resetToken ? (
         <div className="kv-body">
           <nav className="kv-nav" aria-label="Primary">
             {TABS.map((t) => {
@@ -239,7 +253,11 @@ function App() {
           </main>
         </div>
       ) : (
-        <AuthScreen onAuthenticated={() => setSignedIn(true)} />
+        <AuthScreen
+          onAuthenticated={() => setSignedIn(true)}
+          resetToken={resetToken}
+          onResetTokenConsumed={() => setResetToken(null)}
+        />
       )}
     </div>
   );

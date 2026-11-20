@@ -1,6 +1,8 @@
 import {
   checkHealth,
+  forgotPassword,
   login,
+  resetPassword,
   signup,
   listDocuments,
   searchDocuments,
@@ -101,6 +103,55 @@ describe('api client', () => {
   it('signup returns the issued token payload', async () => {
     vi.stubGlobal('fetch', mockFetch(200, { access_token: 'new-tok' }));
     await expect(signup('a@b.c', 'long-enough')).resolves.toEqual({ access_token: 'new-tok' });
+  });
+
+  it('forgotPassword posts the email and resolves the 202 message (KV-59)', async () => {
+    const fetchMock = mockFetch(202, {
+      message: 'If an account exists for that email, we have sent a link.',
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(forgotPassword('a@b.c')).resolves.toEqual({
+      message: 'If an account exists for that email, we have sent a link.',
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toContain('/auth/forgot-password');
+    expect(options.method).toBe('POST');
+    expect(JSON.parse(options.body)).toEqual({ email: 'a@b.c' });
+  });
+
+  it('resetPassword posts the token and new password, and returns the session (KV-59)', async () => {
+    const fetchMock = mockFetch(200, { access_token: 'tok-new' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(resetPassword('tok-123', 'long-enough')).resolves.toEqual({
+      access_token: 'tok-new',
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toContain('/auth/reset-password');
+    expect(JSON.parse(options.body)).toEqual({ token: 'tok-123', password: 'long-enough' });
+  });
+
+  it('a dead reset link carries its code without touching the session (KV-59)', async () => {
+    setToken('tok-abc');
+    const handler = vi.fn();
+    setUnauthorizedHandler(handler);
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(400, {
+        detail: 'This reset link has expired. Ask for a new one.',
+        code: 'reset_token_expired',
+      }),
+    );
+
+    await expect(resetPassword('tok-old', 'long-enough')).rejects.toMatchObject({
+      status: 400,
+      code: 'reset_token_expired',
+    });
+    expect(getToken()).toBe('tok-abc');
+    expect(handler).not.toHaveBeenCalled();
   });
 
   it('non-401 errors carry status and detail without clearing the token', async () => {

@@ -1336,6 +1336,46 @@
   margin-top: 1.4rem;
 }
 
+/* KV-59 — password reset: a quiet link under the password field leads
+   to the forgot form, and the same link style returns to sign-in; the
+   "email sent" confirmation reuses the kv-status banner. */
+.kv-auth2-linkrow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.55rem;
+}
+
+.kv-auth2-backrow {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.kv-auth2-linkbtn {
+  background: none;
+  border: none;
+  padding: 0.15rem 0.1rem;
+  font: inherit;
+  font-size: 0.88rem;
+  color: #1d4ed8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.kv-auth2-linkbtn:hover {
+  color: #122033;
+}
+
+.kv-auth2-linkbtn:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
+}
+
+.kv-auth2-notice {
+  margin-top: 1.1rem;
+}
+
 @media (max-width: 560px) {
   .kv-auth2-hero {
     padding: 1.8rem 1.1rem 4.9rem;
