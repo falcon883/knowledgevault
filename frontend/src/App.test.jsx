@@ -12,6 +12,7 @@ vi.mock('./api.js', () => ({
   signup: vi.fn(),
   forgotPassword: vi.fn(),
   resetPassword: vi.fn(),
+  changePassword: vi.fn(),
   uploadDocument: vi.fn(),
   listDocuments: vi.fn(async () => []),
   getDocument: vi.fn(),
@@ -89,5 +90,14 @@ describe('App shell', () => {
     fireEvent.click(navButton('Search'));
     fireEvent.click(navButton('Browse'));
     await waitFor(() => expect(listDocuments).toHaveBeenCalledTimes(3));
+  });
+
+  it('opens the change password panel from the top bar (KV-62)', () => {
+    setToken('tok');
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Change password' }));
+    expect(screen.getByLabelText('Current password')).toBeInTheDocument();
+    expect(screen.getByLabelText('New password')).toBeInTheDocument();
+    expect(screen.getByLabelText('Confirm new password')).toBeInTheDocument();
   });
 });

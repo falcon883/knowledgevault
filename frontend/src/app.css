@@ -1409,6 +1409,31 @@
   }
 }
 
+/* --- KV-62 change password panel -------------------------------------- */
+
+.kv-changepw {
+  width: calc(100% - 2rem);
+  max-width: 640px;
+  margin: 1.25rem auto 0;
+}
+
+.kv-changepw-title {
+  margin: 0 0 1rem;
+  font-size: 1.15rem;
+}
+
+.kv-changepw .kv-input {
+  width: 100%;
+  margin-bottom: 0.9rem;
+}
+
+.kv-changepw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.25rem;
+}
+
 /* KV-44 — honour reduced-motion: the UI's transitions are decorative
    (hover fades, the busy spinner), so still them for users who ask
    their OS for less motion. */
