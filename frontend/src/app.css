@@ -1409,17 +1409,24 @@
   }
 }
 
-/* --- KV-62 change password panel -------------------------------------- */
+/* --- KV-62 change password page --------------------------------------- */
 
 .kv-changepw {
-  width: calc(100% - 2rem);
-  max-width: 640px;
-  margin: 1.25rem auto 0;
+  max-width: 560px;
+}
+
+.kv-changepw-back {
+  margin-bottom: 1.1rem;
 }
 
 .kv-changepw-title {
-  margin: 0 0 1rem;
-  font-size: 1.15rem;
+  margin: 0 0 0.35rem;
+  font-size: 1.4rem;
+}
+
+.kv-changepw-sub {
+  margin: 0 0 1.1rem;
+  color: #5b6d84;
 }
 
 .kv-changepw .kv-input {
