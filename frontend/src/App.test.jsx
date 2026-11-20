@@ -92,12 +92,22 @@ describe('App shell', () => {
     await waitFor(() => expect(listDocuments).toHaveBeenCalledTimes(3));
   });
 
-  it('opens the change password panel from the top bar (KV-62)', () => {
+  it('opens the change password page from the top bar (KV-62)', () => {
     setToken('tok');
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Change password' }));
     expect(screen.getByLabelText('Current password')).toBeInTheDocument();
     expect(screen.getByLabelText('New password')).toBeInTheDocument();
     expect(screen.getByLabelText('Confirm new password')).toBeInTheDocument();
+    // The page lives inside the shell: the vault tab bar stays put.
+    expect(
+      screen.getByRole('navigation', { name: 'Primary' }),
+    ).toBeInTheDocument();
+    // Cancel returns to the vault tab the user came from (Capture).
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByLabelText('Current password')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Add to your vault' }),
+    ).toBeInTheDocument();
   });
 });

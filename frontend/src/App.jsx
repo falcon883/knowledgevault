@@ -40,10 +40,14 @@ import './app.css';
  * takes over the gate until the token is consumed, even for a user who
  * is still signed in on this browser.
  *
- * KV-62 — the top bar carries a Change password button that opens a
- * panel under the bar (ChangePasswordForm): a signed-in user sets a
- * new password with their current one, no email round trip, and
- * stays signed in on the same token.
+ * KV-62 — change password is a dedicated page in the shell, routed
+ * as #/password alongside the KV-40 tab hashes: the top bar's Change
+ * password button navigates to it, the vault tab bar stays in place,
+ * and Back/Cancel return to the tab the user came from. A signed-in
+ * user sets a new password with their current one, no email round
+ * trip, and stays signed in on the same token. (First shipped as a
+ * panel under the top bar; moved to its own page the same night
+ * because the panel broke the shell layout.)
  *
  * KV-32 — the end-to-end tests found that opening Browse from the sidebar
  * showed a stale list (only the "View in Browse" button refreshed it), so
@@ -75,7 +79,10 @@ const TABS = [
 
 // KV-40 — hash <-> tab mapping. The hash looks like "#/browse"; anything
 // else (empty, unknown tab) is treated as "no tab named" by tabFromHash.
-const TAB_IDS = new Set(TABS.map((t) => t.id));
+// KV-62 — 'password' is a routable page in the shell, not a pill tab:
+// it is a valid hash view (so refresh and Back/Forward work) but never
+// appears in the tab bar.
+const TAB_IDS = new Set([...TABS.map((t) => t.id), 'password']);
 
 function tabFromHash() {
   const raw = window.location.hash.replace(/^#\/?/, '');
@@ -97,8 +104,9 @@ function App() {
   const [resetToken, setResetToken] = useState(
     () => new URLSearchParams(window.location.search).get('reset_token') || null,
   );
-  // KV-62 — whether the change-password panel is open under the top bar.
-  const [changingPassword, setChangingPassword] = useState(false);
+  // KV-62 — the vault tab to return to when leaving the
+  // change-password page (Back/Cancel).
+  const returnTab = useRef('capture');
   // Bumped every time Browse is navigated to from the upload flow, so its
   // list refreshes even though the screen no longer remounts on tab switch.
   const [browseRefresh, setBrowseRefresh] = useState(0);
@@ -169,6 +177,17 @@ function App() {
     selectTab(next);
   }
 
+  // KV-62 — enter/leave the change-password page, remembering the
+  // tab the user came from.
+  function openPasswordPage() {
+    if (tab !== 'password') returnTab.current = tab;
+    selectTab('password');
+  }
+
+  function closePasswordPage() {
+    selectTab(returnTab.current);
+  }
+
   function browseType(type) {
     setBrowseTypeSeed({ type, n: Date.now() });
     navigate('browse');
@@ -176,7 +195,6 @@ function App() {
 
   function signOut() {
     clearToken();
-    setChangingPassword(false);
     setSignedIn(false);
   }
 
@@ -211,8 +229,7 @@ function App() {
               <button
                 type="button"
                 className="kv-btn kv-btn-secondary kv-btn-small"
-                aria-expanded={changingPassword}
-                onClick={() => setChangingPassword((v) => !v)}
+                onClick={openPasswordPage}
               >
                 Change password
               </button>
@@ -227,10 +244,6 @@ function App() {
           )}
         </div>
       </header>
-      )}
-
-      {signedIn && !resetToken && changingPassword && (
-        <ChangePasswordForm onClose={() => setChangingPassword(false)} />
       )}
 
       {signedIn && !resetToken ? (
@@ -273,6 +286,19 @@ function App() {
                 </div>
               );
             })}
+
+            {tab === 'password' && (
+              <div className="kv-changepw-page">
+                <button
+                  type="button"
+                  className="kv-btn kv-btn-secondary kv-btn-small kv-changepw-back"
+                  onClick={closePasswordPage}
+                >
+                  ← Back to vault
+                </button>
+                <ChangePasswordForm onClose={closePasswordPage} />
+              </div>
+            )}
           </main>
         </div>
       ) : (
