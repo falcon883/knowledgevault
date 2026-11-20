@@ -1,6 +1,6 @@
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import AuthScreen from './AuthScreen.jsx';
-import { login, signup } from '../api.js';
+import { forgotPassword, login, resetPassword, signup } from '../api.js';
 import { getToken } from '../auth.js';
 
 // The mode toggle and the submit button can share a label ("Sign in" /
@@ -22,6 +22,8 @@ vi.mock('../api.js', () => ({
   checkHealth: vi.fn(async () => true),
   login: vi.fn(),
   signup: vi.fn(),
+  forgotPassword: vi.fn(),
+  resetPassword: vi.fn(),
 }));
 
 function fillForm(email, password) {
@@ -87,5 +89,126 @@ describe('AuthScreen', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid credentials');
     expect(getToken()).toBeNull();
+  });
+});
+
+// KV-59 — the password reset screens: the forgot form behind the
+// sign-in screen's "Forgot password?" link, and the reset form the
+// shell opens when the emailed link's token arrives as a prop.
+describe('AuthScreen password reset (KV-59)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it('opens the forgot form from sign-in and shows the backend message', async () => {
+    forgotPassword.mockResolvedValue({
+      message:
+        'If an account exists for that email, we have sent a link to reset the password. It works for 30 minutes.',
+    });
+    render(<AuthScreen onAuthenticated={() => {}} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }));
+    expect(screen.getByRole('heading', { name: 'Forgot your password' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'a@b.c' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send reset link' }));
+
+    expect(
+      await screen.findByText(/If an account exists for that email/),
+    ).toBeInTheDocument();
+    expect(forgotPassword).toHaveBeenCalledWith('a@b.c');
+    expect(login).not.toHaveBeenCalled();
+  });
+
+  it('rejects an empty email in the forgot form', async () => {
+    render(<AuthScreen onAuthenticated={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send reset link' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter your email address.');
+    expect(forgotPassword).not.toHaveBeenCalled();
+  });
+
+  it('opens in reset mode when a reset token is supplied', () => {
+    render(
+      <AuthScreen
+        onAuthenticated={() => {}}
+        resetToken="tok-123"
+        onResetTokenConsumed={() => {}}
+      />,
+    );
+    expect(screen.getByRole('heading', { name: 'Choose a new password' })).toBeInTheDocument();
+    expect(screen.getByLabelText('New password')).toBeInTheDocument();
+    expect(screen.getByLabelText('Confirm password')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
+  });
+
+  function fillReset(password, confirm) {
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: password } });
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: confirm } });
+  }
+
+  it('rejects a short or mismatched password in reset mode', async () => {
+    render(
+      <AuthScreen
+        onAuthenticated={() => {}}
+        resetToken="tok-123"
+        onResetTokenConsumed={() => {}}
+      />,
+    );
+
+    fillReset('short', 'short');
+    fireEvent.click(screen.getByRole('button', { name: 'Set new password' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('at least 8 characters');
+
+    fillReset('long-enough', 'different-one');
+    fireEvent.click(screen.getByRole('button', { name: 'Set new password' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The passwords do not match.');
+
+    expect(resetPassword).not.toHaveBeenCalled();
+  });
+
+  it('stores the session token and notifies the shell on a successful reset', async () => {
+    resetPassword.mockResolvedValue({ access_token: 'tok-new' });
+    const onAuthenticated = vi.fn();
+    const onResetTokenConsumed = vi.fn();
+    render(
+      <AuthScreen
+        onAuthenticated={onAuthenticated}
+        resetToken="tok-123"
+        onResetTokenConsumed={onResetTokenConsumed}
+      />,
+    );
+
+    fillReset('long-enough', 'long-enough');
+    fireEvent.click(screen.getByRole('button', { name: 'Set new password' }));
+
+    await waitFor(() => expect(onAuthenticated).toHaveBeenCalledTimes(1));
+    expect(resetPassword).toHaveBeenCalledWith('tok-123', 'long-enough');
+    expect(getToken()).toBe('tok-new');
+    expect(onResetTokenConsumed).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers a new link when the reset link is dead', async () => {
+    resetPassword.mockRejectedValue(
+      Object.assign(new Error('nope'), {
+        detail: 'This reset link has expired. Ask for a new one.',
+        code: 'reset_token_expired',
+      }),
+    );
+    render(
+      <AuthScreen
+        onAuthenticated={() => {}}
+        resetToken="tok-old"
+        onResetTokenConsumed={() => {}}
+      />,
+    );
+
+    fillReset('long-enough', 'long-enough');
+    fireEvent.click(screen.getByRole('button', { name: 'Set new password' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('This reset link has expired');
+    fireEvent.click(screen.getByRole('button', { name: 'Ask for a new link' }));
+    expect(screen.getByRole('heading', { name: 'Forgot your password' })).toBeInTheDocument();
   });
 });

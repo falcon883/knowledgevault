@@ -10,6 +10,8 @@ vi.mock('./api.js', () => ({
   checkHealth: vi.fn(async () => true),
   login: vi.fn(),
   signup: vi.fn(),
+  forgotPassword: vi.fn(),
+  resetPassword: vi.fn(),
   uploadDocument: vi.fn(),
   listDocuments: vi.fn(async () => []),
   getDocument: vi.fn(),
@@ -26,7 +28,15 @@ describe('App shell', () => {
   beforeEach(() => {
     localStorage.clear();
     window.location.hash = '';
+    window.history.pushState({}, '', '/');
     vi.clearAllMocks();
+  });
+
+  it('opens the reset screen when the URL carries a reset token (KV-59)', () => {
+    window.history.pushState({}, '', '/?reset_token=tok-abc');
+    render(<App />);
+    expect(screen.getByRole('heading', { name: 'Choose a new password' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument();
   });
 
   it('shows the sign-in gate when no token is stored', () => {
